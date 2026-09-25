@@ -1,0 +1,40 @@
+# secrets
+.env
+.env.local
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# node
+node_modules/
+dist/
+.vercel/
+
+# data the coop produces
+data/
+*.db
+*.sqlite
+frames/
+clips/
+
+# os and logs
+*.log
+.DS_Store
+Thumbs.db
+
+# local working notes, decision log, and anything about the competition
+# submission or strategy: the public repo is code and README only
+ADR.md
+.notes/
+.scratch/
+/strategy/
+/submission/
+/SUBMISSION*
+/demo-script*
+/devpost*
+/*.docx
+/*.pdf
