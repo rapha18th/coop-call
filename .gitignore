@@ -38,3 +38,6 @@ ADR.md
 /devpost*
 /*.docx
 /*.pdf
+
+# local tooling
+.claude/
