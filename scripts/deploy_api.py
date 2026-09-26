@@ -36,8 +36,8 @@ def main() -> None:
     if sa and Path(sa).exists():
         api.add_space_secret(SPACE, "FIREBASE_SERVICE_ACCOUNT",
                              json.dumps(json.loads(Path(sa).read_text(encoding="utf-8"))))
-    elif not sa:
-        print("warning: FIREBASE_SERVICE_ACCOUNT not set, the Space cannot reach Firebase", file=sys.stderr)
+    else:
+        sys.exit(f"FIREBASE_SERVICE_ACCOUNT must point to a readable JSON key file (got {sa!r})")
     api.upload_folder(
         folder_path=str(ROOT / "api"), repo_id=SPACE, repo_type="space",
         ignore_patterns=[".venv/*", "**/__pycache__/*", "*.pyc"],
