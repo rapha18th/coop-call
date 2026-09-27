@@ -53,7 +53,9 @@ PROMPT = (
     "You are watching a small poultry house through a fixed phone camera. Describe "
     "only what is visible. Count birds carefully; estimate when many overlap. Judge "
     "feeder and drinker levels only if you can see them, otherwise say not_visible. "
-    "Never guess at disease."
+    "For a translucent drinker or feeder tube, find the fill line: above about three "
+    "quarters is full, about half is half, below a third is low, nothing visible is "
+    "empty. Check the drinker's base tray too. Never guess at disease."
 )
 
 
@@ -69,8 +71,9 @@ def read_frame(jpeg: bytes) -> dict:
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_json_schema=SCHEMA,
-            media_resolution=types.MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+            media_resolution=types.MediaResolution.MEDIA_RESOLUTION_HIGH,
             temperature=0.1,
+            thinking_config=types.ThinkingConfig(thinking_level="minimal"),
         ),
     )
     data = json.loads(response.text)
