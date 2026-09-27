@@ -62,6 +62,14 @@ TOOLS = [
     },
     {
         "type": "function",
+        "name": "coop_week",
+        "description": "This week's flock metrics and advice: care score, water and feed availability, minutes the drinker was dry, cold and heat, calm nights, bird count, flock age. Use for how are we doing, what should I change, any advice.",
+        "parameters": {"type": "object", "properties": {}},
+        "execution_mode": "hold",
+        "timeout_seconds": 25,
+    },
+    {
+        "type": "function",
         "name": "coop_alarms",
         "description": "Open alarms: what is wrong, since when.",
         "parameters": {"type": "object", "properties": {}},
@@ -116,10 +124,10 @@ def greeting(coop: dict, alarm: dict | None) -> str:
     return f"Hello, it's {coop['name']}. Ask me anything about the birds."
 
 
-def session(coop: dict, alarm_id: str | None) -> dict:
+def session(coop: dict, alarm_id: str | None, by: str | None = None) -> dict:
     alarm = alarms.get_alarm(coop["id"], alarm_id) if alarm_id else None
     if alarm and alarm["status"] == "ringing":
-        alarms.set_status(coop["id"], alarm["id"], "answered")
+        alarms.set_status(coop["id"], alarm["id"], "answered", by)
     return {
         "system_prompt": system_prompt(coop, alarm),
         "greeting": greeting(coop, alarm),

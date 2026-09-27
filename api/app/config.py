@@ -50,6 +50,12 @@ WEB_ORIGINS = [o for o in os.environ.get("WEB_ORIGINS", "http://localhost:5173")
 WEB_URL = os.environ.get("WEB_URL", "http://localhost:5173")
 
 DEMO_COOP_ID = os.environ.get("DEMO_COOP_ID", "demo")
+ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get(
+    "ADMIN_EMAILS", "rairorr@gmail.com,initiumzim@gmail.com").split(",") if e.strip()}
+
+# List prices, for the admin console's cost estimates only.
+ASSEMBLYAI_USD_PER_HOUR = 4.50
+GEMINI_USD_PER_FRAME = 0.0012
 TZ = ZoneInfo(os.environ.get("COOP_TZ", "Africa/Harare"))
 
 # Cost guards: the phone decides what to send, the server caps what it analyses.

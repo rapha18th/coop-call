@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import type { User } from 'firebase/auth'
-import { DEMO_COOP, api, post, signIn, watchUser, type Alarm, type Hour, type State } from '../lib/api'
+import { DEMO_COOP, api, post, signIn, watchUser, type Alarm, type State } from '../lib/api'
 import { CoopCall, type CallStatus, type Evidence } from '../lib/call'
 import { letCoopCall, pushSupported } from '../lib/push'
+import { Calls, Metrics, TeamPanel } from '../components/Panels'
 
 const STATUS_WORDS: Record<CallStatus, string> = {
   idle: '',
@@ -31,6 +32,7 @@ export default function CoopPage() {
   const [coopSaid, setCoopSaid] = useState('')
   const [evidence, setEvidence] = useState<Evidence | null>(null)
   const [ringing, setRinging] = useState(Boolean(incomingAlarm))
+  const [refreshKey, setRefreshKey] = useState(0)
   const call = useRef<CoopCall | null>(null)
   const live = status === 'connecting' || status === 'listening' || status === 'thinking' || status === 'speaking'
 
@@ -57,7 +59,10 @@ export default function CoopPage() {
       status: (s, d) => {
         setStatus(s)
         if (d) setDetail(d)
-        if (s === 'ended' || s === 'error') refresh()
+        if (s === 'ended' || s === 'error') {
+          refresh()
+          setTimeout(() => setRefreshKey((k) => k + 1), 1500)
+        }
       },
       line: (l) => (l.who === 'you' ? setYou(l.text) : setCoopSaid(l.text)),
       evidence: (e) => setEvidence(e),
@@ -81,6 +86,7 @@ export default function CoopPage() {
           {state?.coop.name ?? ' '}
           {state?.now.note && <span className="badge">{state.now.note}</span>}
         </span>
+        {user && <Link to="/farm" className="quiet-link">Your farm</Link>}
         {user === null && <button className="quiet-link" onClick={() => signIn()}>Sign in</button>}
       </header>
 
@@ -125,11 +131,6 @@ export default function CoopPage() {
             {state?.now.sensors && <p className="now-sub">{state.now.sensors}</p>}
           </div>
 
-          <div className="panel">
-            <div className="label">The last 24 hours</div>
-            <Strip hours={state?.strip ?? []} />
-          </div>
-
           {!!state?.alarms.length && (
             <div className="panel">
               <div className="label" style={{ marginBottom: 6 }}>Needs you</div>
@@ -139,8 +140,17 @@ export default function CoopPage() {
             </div>
           )}
 
-          {state?.owner && <OwnerTools coopId={coopId} onChange={refresh} />}
+          {state && ['owner', 'keeper', 'admin'].includes(state.role) && (
+            <OwnerTools coopId={coopId} canPair={state.owner} onChange={refresh} />
+          )}
         </aside>
+      </div>
+
+      <Metrics coopId={coopId} refreshKey={refreshKey} />
+
+      <div className="grid lower">
+        <Calls coopId={coopId} refreshKey={refreshKey} />
+        {user && state && state.role !== 'public' && <TeamPanel coopId={coopId} />}
       </div>
 
       {ringing && incomingAlarm && (
@@ -152,41 +162,6 @@ export default function CoopPage() {
         />
       )}
     </div>
-  )
-}
-
-function Strip({ hours }: { hours: Hour[] }) {
-  const byHour = new Map(hours.map((h) => [h.hour.slice(8, 10), h]))
-  const now = new Date()
-  const slots = Array.from({ length: 24 }, (_, i) => {
-    const d = new Date(now.getTime() - (23 - i) * 3600_000)
-    return String(d.getHours()).padStart(2, '0')
-  })
-  const peak = Math.max(1, ...hours.map((h) => h.birds ?? 0))
-  return (
-    <>
-      <div className="strip">
-        {slots.map((hh) => {
-          const h = byHour.get(hh)
-          const tone = !h?.nv ? '' : h.drinker_low >= 0.3 || h.agitated >= 0.3 || h.notes ? 'warn' : h.huddled >= 0.3 ? 'cold' : 'seen'
-          const height = h?.birds ? 12 + (88 * h.birds) / peak : 4
-          return (
-            <div
-              key={hh}
-              className={`bar ${tone}`}
-              style={{ height: `${height}%` }}
-              title={h ? `${hh}:00 · ${h.birds ?? '?'} birds${h.huddled >= 0.3 ? ' · huddled' : ''}${h.drinker_low >= 0.3 ? ' · drinker low' : ''}` : `${hh}:00 · no reading`}
-            />
-          )
-        })}
-      </div>
-      <div className="strip-axis">
-        <span>{slots[0]}:00</span>
-        <span>{slots[12]}:00</span>
-        <span>now</span>
-      </div>
-      <p className="note">Warm is a normal hour, blue means the flock huddled, red needs a look.</p>
-    </>
   )
 }
 
@@ -217,7 +192,7 @@ function Incoming({ coopName, alarm, onAnswer, onDecline }: {
   )
 }
 
-function OwnerTools({ coopId, onChange }: { coopId: string; onChange: () => void }) {
+function OwnerTools({ coopId, canPair, onChange }: { coopId: string; canPair: boolean; onChange: () => void }) {
   const [search] = useSearchParams()
   const [pairUrl, setPairUrl] = useState('')
   const [qr, setQr] = useState('')
@@ -268,9 +243,9 @@ function OwnerTools({ coopId, onChange }: { coopId: string; onChange: () => void
 
   return (
     <div className="panel">
-      <div className="label" style={{ marginBottom: 10 }}>Your coop</div>
+      <div className="label" style={{ marginBottom: 10 }}>Keeping watch</div>
       <div className="row">
-        <button className="btn" onClick={pair}>Pair a coop phone</button>
+        {canPair && <button className="btn" onClick={pair}>Pair a coop phone</button>}
         {pushSupported() && <button className="btn" onClick={subscribe}>Let the coop call me</button>}
         <button className="btn" onClick={ringNow}>Test a call from the coop</button>
       </div>

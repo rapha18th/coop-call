@@ -76,4 +76,56 @@ export type Hour = {
 
 export type Coop = { id: string; name: string; birds_expected?: number; owner_name?: string }
 
-export type State = { coop: Coop; now: Now; alarms: Alarm[]; strip: Hour[]; owner: boolean }
+export type State = { coop: Coop; role: string; now: Now; alarms: Alarm[]; strip: Hour[]; owner: boolean }
+
+export type Me = { uid: string; email: string; name: string; admin: boolean }
+
+export type Card = Coop & {
+  role: string
+  open_alarms: number
+  latest: {
+    time: string; ago: string; birds: number; spread: string; drinker: string; feeder: string
+    frame_url?: string | null; simulated: boolean
+  } | null
+}
+
+export type Cell = { state: 'none' | 'fine' | 'cold' | 'hot'; water?: boolean; feed?: boolean; note?: boolean; birds?: number }
+
+export type Day = {
+  day: string; readings: number; coverage_h: number; water_ok?: number; dry_minutes?: number
+  feed_ok?: number; empty_feeder_minutes?: number; cold?: number; hot?: number; comfort?: number
+  calm_nights?: number; birds_mean?: number; birds_max?: number; care?: number; simulated?: boolean
+}
+
+export type Week = {
+  days: Day[]
+  grid: { day: string; hours: Cell[] }[]
+  today: Day
+  insights: { kind: string; level: 'act' | 'watch' | 'ok'; text: string }[]
+  flock: { expected?: number; age_days: number; week_of_life: number }
+  alarms: { count: number; by_kind: Record<string, number>; unanswered: number; median_answer_min: number | null }
+  calls: { count: number; minutes: number }
+  care_weights: Record<string, number>
+}
+
+export type CallRecord = {
+  id: string; when: string; name: string; role: string; alarm_id?: string | null
+  duration_s?: number; status: string; tools: string[]; evidence: number
+  transcript: { who: string; text: string }[]
+}
+
+export type Member = { uid: string; role: string; name?: string; email?: string }
+export type Team = { members: Member[]; invites: { email: string; role: string }[]; can_manage: boolean }
+
+export type AdminOverview = {
+  coops: { id: string; name: string; owner: string; members: number; invites: number; birds?: number; last_seen: string; open_alarms: number; calls_7d: number }[]
+  users: { uid: string; email: string; name: string; coops: number; blocked: boolean; admin: boolean; first_seen: string; last_seen: string }[]
+  usage: { day: string; frames: number; calls: number; call_minutes: number; cost_usd: number }[]
+}
+
+export const del = <T = any>(path: string) => api<T>(path, { method: 'DELETE' })
+export const patch = <T = any>(path: string, body: unknown) =>
+  api<T>(path, { method: 'PATCH', body: JSON.stringify(body) })
+
+export const dayLabel = (d: string) =>
+  new Date(`${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })

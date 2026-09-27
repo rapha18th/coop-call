@@ -74,10 +74,12 @@ def resolve(coop_id: str, kind: str) -> None:
             _alarms(coop_id).document(a["id"]).update({"status": "resolved", "resolved_at": store.now()})
 
 
-def set_status(coop_id: str, alarm_id: str, status: str) -> None:
-    update = {"status": status}
+def set_status(coop_id: str, alarm_id: str, status: str, by: str | None = None) -> None:
+    update: dict = {"status": status}
+    if status == "answered":
+        update.update({"answered_at": store.now(), "answered_by": by})
     if status == "resolved":
-        update["resolved_at"] = store.now()
+        update.update({"resolved_at": store.now(), "resolved_by": by})
     _alarms(coop_id).document(alarm_id).update(update)
 
 
@@ -137,14 +139,25 @@ def _subs(coop_id: str):
     return store.coop_ref(coop_id).collection("push")
 
 
-def subscribe(coop_id: str, sub: dict) -> None:
-    _subs(coop_id).document(store.hash_key(sub["endpoint"])[:32]).set({"sub": sub, "ts": store.now()})
+def subscribe(coop_id: str, sub: dict, uid: str | None) -> None:
+    _subs(coop_id).document(store.hash_key(sub["endpoint"])[:32]).set(
+        {"sub": sub, "uid": uid, "ts": store.now()})
+
+
+def _ladder(coop_id: str, ring_no: int) -> set[str] | None:
+    """Rings one and two reach the owner. From ring three, the whole team. None means everyone."""
+    if ring_no >= 2:
+        return None
+    coop = store.get_coop(coop_id) or {}
+    return {uid for uid, m in coop.get("members", {}).items() if m.get("role") == "owner"} or {coop.get("owner_uid")}
 
 
 def ring(coop_id: str, alarm: dict) -> int:
     """Web push styled as an incoming call. Tapping it opens the call with the alarm loaded."""
+    ring_no = alarm.get("rings", 0)
     _alarms(coop_id).document(alarm["id"]).update(
         {"rings": firestore.Increment(1), "last_ring": store.now()})
+    reach = _ladder(coop_id, ring_no)
     if not config.VAPID_PRIVATE_KEY:
         log.warning("no VAPID key, cannot ring")
         return 0
@@ -156,6 +169,8 @@ def ring(coop_id: str, alarm: dict) -> int:
     })
     sent = 0
     for doc in _subs(coop_id).stream():
+        if reach is not None and doc.to_dict().get("uid") not in reach:
+            continue
         try:
             webpush(subscription_info=doc.to_dict()["sub"], data=payload,
                     vapid_private_key=config.VAPID_PRIVATE_KEY,

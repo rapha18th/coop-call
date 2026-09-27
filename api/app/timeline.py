@@ -65,6 +65,7 @@ def fold(h: dict | None, obs: dict) -> dict:
             ("feeder_low", obs.get("feeder") in LOW),
             ("drinker_low", obs.get("drinker") in LOW),
             ("drinker_empty", obs.get("drinker") == "empty"),
+            ("feeder_empty", obs.get("feeder") == "empty"),
             ("lights_off", obs.get("lights") == "off"),
         ):
             if hit:

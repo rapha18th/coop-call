@@ -8,56 +8,85 @@ import logging
 import time
 from collections import defaultdict, deque
 from datetime import timedelta
+from typing import Literal
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from google.cloud import firestore
 from pydantic import BaseModel, Field
 
-from . import alarms, config, store, timeline, vision, voice
+from . import alarms, config, metrics, store, timeline, vision, voice
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("coop")
 
-app = FastAPI(title="Ziso API", version="0.1.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=config.WEB_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="Ziso API", version="0.2.0")
+app.add_middleware(CORSMiddleware, allow_origins=config.WEB_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
 _last_vision: dict[str, float] = {}
 _demo_calls: dict[str, deque] = defaultdict(deque)
+_touched: dict[str, tuple[float, dict]] = {}
+
+Role = Literal["owner", "keeper", "viewer"]
+RANK = {"public": 0, "viewer": 1, "keeper": 2, "owner": 3, "admin": 4}
 
 
-# ------------------------------------------------------------------ access
+# ------------------------------------------------------------------ who is asking
 
 
 def user(authorization: str | None = Header(default=None)) -> dict | None:
     if not authorization or not authorization.startswith("Bearer "):
         return None
     try:
-        return store.verify_id_token(authorization.removeprefix("Bearer ").strip())
+        claims = store.verify_id_token(authorization.removeprefix("Bearer ").strip())
     except Exception:
         raise HTTPException(401, "sign in again")
+    uid = claims["uid"]
+    cached = _touched.get(uid)
+    if not cached or time.time() - cached[0] > 600:
+        cached = (time.time(), store.touch_user(claims))
+        _touched[uid] = cached
+    if cached[1].get("blocked"):
+        raise HTTPException(403, "this account is paused. Contact the Coop Call team.")
+    claims["admin"] = bool(claims.get("email_verified")) and (claims.get("email") or "").lower() in config.ADMIN_EMAILS
+    return claims
 
 
-def coop_for(coop_id: str, who: dict | None, write: bool = False) -> dict:
+def signed_in(who: dict | None = Depends(user)) -> dict:
+    if not who:
+        raise HTTPException(401, "sign in")
+    return who
+
+
+def admin(who: dict = Depends(signed_in)) -> dict:
+    if not who["admin"]:
+        raise HTTPException(403, "admins only")
+    return who
+
+
+def role_of(coop: dict, who: dict | None) -> str:
+    if who and who.get("admin"):
+        return "admin"
+    if who:
+        if who["uid"] == coop.get("owner_uid"):
+            return "owner"
+        member = coop.get("members", {}).get(who["uid"])
+        if member:
+            return member["role"]
+    return "public" if coop["id"] == config.DEMO_COOP_ID else "none"
+
+
+def access(coop_id: str, who: dict | None, need: str = "viewer") -> tuple[dict, str]:
     coop = store.get_coop(coop_id)
     if not coop:
         raise HTTPException(404, "no such coop")
-    if who and who["uid"] == coop["owner_uid"]:
-        return coop
-    if coop_id == config.DEMO_COOP_ID and not write:
-        return coop
-    raise HTTPException(403, "not your coop")
-
-
-def node_coop(coop_id: str, x_node_key: str | None) -> dict:
-    coop = store.coop_for_node_key(coop_id, x_node_key or "")
-    if not coop:
-        raise HTTPException(403, "this phone is not paired with the coop")
-    return coop
+    role = role_of(coop, who)
+    if role == "none":
+        raise HTTPException(403, "not your coop")
+    need_rank = 0 if (need == "viewer" and role == "public") else RANK[need]
+    if RANK[role] < need_rank:
+        raise HTTPException(403, f"needs a {need}")
+    return coop, role
 
 
 def demo_rate_limit(request: Request) -> None:
@@ -85,7 +114,30 @@ def push_key() -> dict:
     return {"key": config.VAPID_PUBLIC_KEY}
 
 
+@app.get("/api/me")
+def me(who: dict = Depends(signed_in)) -> dict:
+    return {"uid": who["uid"], "email": who.get("email"), "name": who.get("name"), "admin": who["admin"]}
+
+
 # ------------------------------------------------------------------ coops
+
+
+def _public(coop: dict) -> dict:
+    return {k: v for k, v in coop.items() if k not in ("node_key_hash", "invites", "invite_emails", "member_uids")}
+
+
+def _card(coop: dict, role: str) -> dict:
+    v = timeline.latest(coop["id"], "vision")
+    return {
+        **_public(coop),
+        "role": role,
+        "open_alarms": len(alarms.open_alarms(coop["id"])),
+        "latest": {
+            "time": timeline.clock(v["ts"]), "ago": timeline.ago(v["ts"]), "birds": v.get("birds"),
+            "spread": v.get("spread"), "drinker": v.get("drinker"), "feeder": v.get("feeder"),
+            "frame_url": store.frame_url(v.get("frame")), "simulated": bool(v.get("simulated")),
+        } if v else None,
+    }
 
 
 class NewCoop(BaseModel):
@@ -95,58 +147,128 @@ class NewCoop(BaseModel):
 
 
 @app.get("/api/coops")
-def my_coops(who: dict | None = Depends(user)) -> list[dict]:
-    if not who:
-        raise HTTPException(401, "sign in")
-    return [_public(c) for c in store.coops_for(who["uid"])]
+def my_coops(who: dict = Depends(signed_in)) -> list[dict]:
+    coops = [store.backfill_owner(c, who) for c in store.coops_for(who["uid"], who.get("email", ""), who.get("name", ""))]
+    return [_card(c, role_of(c, who)) for c in coops]
 
 
 @app.post("/api/coops")
-def new_coop(body: NewCoop, who: dict | None = Depends(user)) -> dict:
-    if not who:
-        raise HTTPException(401, "sign in")
-    coop, key = store.create_coop(who["uid"], body.name, who.get("name", ""), body.birds, body.age_days)
+def new_coop(body: NewCoop, who: dict = Depends(signed_in)) -> dict:
+    coop, key = store.create_coop(who["uid"], body.name, who.get("name", ""), body.birds, body.age_days,
+                                  owner_email=(who.get("email") or "").lower())
     return {"coop": _public(coop), "node_key": key}
 
 
+class CoopEdit(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=40)
+    birds: int | None = Field(default=None, ge=0, le=100000)
+    age_days: int | None = Field(default=None, ge=0, le=1000)
+
+
+@app.patch("/api/coops/{coop_id}")
+def edit_coop(coop_id: str, body: CoopEdit, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "owner")
+    update = {k: v for k, v in {"name": body.name, "birds_expected": body.birds}.items() if v is not None}
+    if body.age_days is not None:
+        update.update({"age_days_at_start": body.age_days, "created": store.now()})
+    if update:
+        store.coop_ref(coop_id).update(update)
+    return {"ok": True}
+
+
 @app.post("/api/coops/{coop_id}/node-key")
-def rotate_key(coop_id: str, who: dict | None = Depends(user)) -> dict:
-    coop_for(coop_id, who, write=True)
+def rotate_key(coop_id: str, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "owner")
     return {"node_key": store.rotate_node_key(coop_id)}
-
-
-def _public(coop: dict) -> dict:
-    return {k: v for k, v in coop.items() if k != "node_key_hash"}
 
 
 @app.get("/api/coops/{coop_id}/state")
 def state(coop_id: str, who: dict | None = Depends(user)) -> dict:
-    coop = coop_for(coop_id, who)
+    coop, role = access(coop_id, who)
     now = store.now()
     hours = timeline.hours_between(coop_id, now - timedelta(hours=23), now)
     strip = [{
-        "hour": h["hour"],
-        "nv": h.get("nv", 0),
+        "hour": h["hour"], "nv": h.get("nv", 0),
         "birds": round(h["birds_sum"] / h["nv"]) if h.get("nv") else None,
-        "huddled": timeline._frac(h, "huddled"),
-        "drinker_low": timeline._frac(h, "drinker_low"),
-        "agitated": timeline._frac(h, "agitated"),
-        "sound": timeline._mean(h, "sound_db"),
-        "notes": len(h.get("notes", [])),
-        "simulated": bool(h.get("simulated")),
+        "huddled": timeline._frac(h, "huddled"), "drinker_low": timeline._frac(h, "drinker_low"),
+        "agitated": timeline._frac(h, "agitated"), "sound": timeline._mean(h, "sound_db"),
+        "notes": len(h.get("notes", [])), "simulated": bool(h.get("simulated")),
     } for h in hours]
     return {
         "coop": _public(coop),
+        "role": role,
         "now": timeline.answer_now(coop_id),
         "alarms": [_alarm_view(a) for a in alarms.open_alarms(coop_id)],
         "strip": strip,
-        "owner": bool(who and who["uid"] == coop["owner_uid"]),
+        "owner": role in ("owner", "admin"),
     }
+
+
+@app.get("/api/coops/{coop_id}/metrics")
+def coop_metrics(coop_id: str, days: int = 7, who: dict | None = Depends(user)) -> dict:
+    coop, _ = access(coop_id, who)
+    return metrics.week(coop, max(1, min(days, 14)))
 
 
 def _alarm_view(a: dict) -> dict:
     return {"id": a["id"], "kind": a["kind"], "message": a["message"], "status": a["status"],
             "time": timeline.clock(a["ts"]), "frame_url": store.frame_url(a.get("frame"))}
+
+
+# ------------------------------------------------------------------ the team
+
+
+class Invite(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    role: Literal["keeper", "viewer"] = "keeper"
+
+
+@app.get("/api/coops/{coop_id}/team")
+def team(coop_id: str, who: dict = Depends(signed_in)) -> dict:
+    coop, role = access(coop_id, who)
+    coop = store.backfill_owner(coop, who)
+    members = sorted(({"uid": uid, **m} for uid, m in coop.get("members", {}).items()),
+                     key=lambda m: m.get("order", 99))
+    invites = list(coop.get("invites", {}).values()) if RANK[role] >= RANK["owner"] else []
+    return {"members": members, "invites": invites, "can_manage": RANK[role] >= RANK["owner"]}
+
+
+@app.post("/api/coops/{coop_id}/team")
+def invite(coop_id: str, body: Invite, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "owner")
+    if "@" not in body.email:
+        raise HTTPException(400, "that is not an email address")
+    store.invite(coop_id, body.email, body.role, who["uid"])
+    return {"ok": True}
+
+
+class MemberChange(BaseModel):
+    role: Literal["keeper", "viewer"] | None = None
+
+
+@app.patch("/api/coops/{coop_id}/team/{uid}")
+def change_member(coop_id: str, uid: str, body: MemberChange, who: dict = Depends(signed_in)) -> dict:
+    coop, _ = access(coop_id, who, "owner")
+    if uid == coop["owner_uid"]:
+        raise HTTPException(400, "the owner stays the owner")
+    store.set_member(coop_id, uid, body.role)
+    return {"ok": True}
+
+
+@app.delete("/api/coops/{coop_id}/team/{uid}")
+def remove_member(coop_id: str, uid: str, who: dict = Depends(signed_in)) -> dict:
+    coop, _ = access(coop_id, who, "owner")
+    if uid == coop["owner_uid"]:
+        raise HTTPException(400, "the owner stays the owner")
+    store.set_member(coop_id, uid, None)
+    return {"ok": True}
+
+
+@app.delete("/api/coops/{coop_id}/invites/{email}")
+def cancel_invite(coop_id: str, email: str, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "owner")
+    store.cancel_invite(coop_id, email)
+    return {"ok": True}
 
 
 # ------------------------------------------------------------------ the coop phone
@@ -162,12 +284,17 @@ def _num(v) -> float | None:
 def _sensor_obs(sensors: dict, ts, simulated: bool = False) -> dict:
     return {
         "ts": ts, "source": "sensor", "simulated": simulated,
-        "brightness": _num(sensors.get("brightness")),
-        "sound_db": _num(sensors.get("sound_db")),
-        "motion": _num(sensors.get("motion")),
-        "battery": _num(sensors.get("battery")),
+        "brightness": _num(sensors.get("brightness")), "sound_db": _num(sensors.get("sound_db")),
+        "motion": _num(sensors.get("motion")), "battery": _num(sensors.get("battery")),
         "charging": bool(sensors.get("charging")),
     }
+
+
+def node_coop(coop_id: str, x_node_key: str | None) -> dict:
+    coop = store.coop_for_node_key(coop_id, x_node_key or "")
+    if not coop:
+        raise HTTPException(403, "this phone is not paired with the coop")
+    return coop
 
 
 class Beat(BaseModel):
@@ -190,8 +317,7 @@ def frame(coop_id: str, image: UploadFile = File(...), sensors: str = Form("{}")
           x_node_key: str | None = Header(default=None)) -> dict:
     node_coop(coop_id, x_node_key)
     ts = store.now()
-    readings = json.loads(sensors or "{}")
-    timeline.record(coop_id, _sensor_obs(readings, ts))
+    timeline.record(coop_id, _sensor_obs(json.loads(sensors or "{}"), ts))
 
     since = time.time() - _last_vision.get(coop_id, 0)
     if since < config.MIN_VISION_INTERVAL_S:
@@ -207,8 +333,8 @@ def frame(coop_id: str, image: UploadFile = File(...), sensors: str = Form("{}")
     except Exception as exc:
         log.exception("vision failed")
         return {"analysed": False, "error": str(exc)[:200]}
-    obs = {"ts": ts, "source": "vision", "simulated": False, "frame": path, **seen}
-    timeline.record(coop_id, obs)
+    store.bump_usage(frames=1)
+    timeline.record(coop_id, {"ts": ts, "source": "vision", "simulated": False, "frame": path, **seen})
     alarms.evaluate(coop_id)
     return {"analysed": True, "seen": seen}
 
@@ -222,17 +348,60 @@ class CallRequest(BaseModel):
 
 @app.post("/api/coops/{coop_id}/call")
 def call(coop_id: str, body: CallRequest, request: Request, who: dict | None = Depends(user)) -> dict:
-    coop = coop_for(coop_id, who)
-    if not (who and who["uid"] == coop["owner_uid"]):
+    coop, role = access(coop_id, who)
+    if role == "public":
         demo_rate_limit(request)
     if not config.ASSEMBLYAI_API_KEY:
         raise HTTPException(503, "voice is not configured")
-    return {"token": voice.mint_token(), "session": voice.session(coop, body.alarm_id)}
+    token = voice.mint_token()
+    session = voice.session(coop, body.alarm_id, who["uid"] if who else None)
+    ref = store.coop_ref(coop_id).collection("calls").document()
+    ref.set({"ts": store.now(), "uid": who["uid"] if who else None,
+             "name": (who or {}).get("name") or ("Demo caller" if role == "public" else ""),
+             "role": role, "alarm_id": body.alarm_id, "status": "live"})
+    return {"token": token, "session": session, "call_id": ref.id}
+
+
+class CallEnd(BaseModel):
+    duration_s: float = Field(ge=0, le=36000)
+    transcript: list[dict] = Field(default_factory=list, max_length=400)
+    tools: list[str] = Field(default_factory=list, max_length=200)
+    evidence: int = 0
+
+
+@app.post("/api/coops/{coop_id}/calls/{call_id}/end")
+def call_end(coop_id: str, call_id: str, body: CallEnd, who: dict | None = Depends(user)) -> dict:
+    access(coop_id, who)
+    ref = store.coop_ref(coop_id).collection("calls").document(call_id)
+    snap = ref.get()
+    if not snap.exists or snap.to_dict().get("status") != "live":
+        raise HTTPException(409, "that call is already closed")
+    lines = [{"who": str(l.get("who"))[:8], "text": str(l.get("text"))[:600]} for l in body.transcript]
+    ref.update({"status": "ended", "ended_at": store.now(), "duration_s": round(body.duration_s),
+                "transcript": lines, "tools": body.tools[:200], "evidence": body.evidence})
+    store.bump_usage(calls=1, call_seconds=round(body.duration_s))
+    return {"ok": True}
+
+
+@app.get("/api/coops/{coop_id}/calls")
+def calls(coop_id: str, limit: int = 30, who: dict | None = Depends(user)) -> list[dict]:
+    access(coop_id, who)
+    q = (store.coop_ref(coop_id).collection("calls")
+         .order_by("ts", direction=firestore.Query.DESCENDING).limit(max(1, min(limit, 100))))
+    out = []
+    for d in q.stream():
+        c = d.to_dict()
+        out.append({"id": d.id, "when": store.local(c["ts"]).strftime("%a %d %b %H:%M"),
+                    "name": c.get("name") or "", "role": c.get("role"), "alarm_id": c.get("alarm_id"),
+                    "duration_s": c.get("duration_s"), "status": c.get("status"),
+                    "tools": c.get("tools", []), "evidence": c.get("evidence", 0),
+                    "transcript": c.get("transcript", [])})
+    return out
 
 
 @app.post("/api/coops/{coop_id}/tools/{name}")
 def tool(coop_id: str, name: str, args: dict, who: dict | None = Depends(user)) -> dict:
-    coop = coop_for(coop_id, who)
+    coop, role = access(coop_id, who)
     try:
         if name == "coop_now":
             return timeline.answer_now(coop_id)
@@ -247,10 +416,14 @@ def tool(coop_id: str, name: str, args: dict, who: dict | None = Depends(user)) 
             found = alarms.open_alarms(coop_id)
             return {"alarms": [{"id": a["id"], "message": a["message"], "since": timeline.clock(a["ts"]),
                                 "status": a["status"]} for a in found] or "No open alarms."}
+        if name == "coop_week":
+            w = metrics.week(coop, 7)
+            return {"today": w["today"], "insights": [i["text"] for i in w["insights"]],
+                    "flock": w["flock"], "alarms": w["alarms"]}
         if name == "resolve_alarm":
-            if not (who and who["uid"] == coop["owner_uid"]) and coop_id != config.DEMO_COOP_ID:
-                raise HTTPException(403, "not your coop")
-            alarms.set_status(coop_id, args["alarm_id"], "resolved")
+            if RANK[role] < RANK["keeper"] and role != "public":
+                raise HTTPException(403, "needs a keeper")
+            alarms.set_status(coop_id, args["alarm_id"], "resolved", who["uid"] if who else None)
             return {"ok": True}
     except (KeyError, ValueError) as exc:
         return {"error": f"bad arguments: {exc}"}
@@ -262,10 +435,10 @@ def tool(coop_id: str, name: str, args: dict, who: dict | None = Depends(user)) 
 
 @app.post("/api/coops/{coop_id}/push/subscribe")
 def subscribe(coop_id: str, sub: dict, who: dict | None = Depends(user)) -> dict:
-    coop_for(coop_id, who)
+    access(coop_id, who)
     if "endpoint" not in sub:
         raise HTTPException(400, "not a push subscription")
-    alarms.subscribe(coop_id, sub)
+    alarms.subscribe(coop_id, sub, who["uid"] if who else None)
     return {"ok": True}
 
 
@@ -274,8 +447,8 @@ class TestAlarm(BaseModel):
 
 
 @app.post("/api/coops/{coop_id}/alarms/test")
-def test_alarm(coop_id: str, body: TestAlarm, who: dict | None = Depends(user)) -> dict:
-    coop_for(coop_id, who, write=True)
+def test_alarm(coop_id: str, body: TestAlarm, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "keeper")
     alarms.resolve(coop_id, body.kind)
     latest = timeline.latest(coop_id, "vision")
     alarm = alarms.raise_alarm(coop_id, body.kind, "(test)", latest.get("frame") if latest else None)
@@ -283,9 +456,65 @@ def test_alarm(coop_id: str, body: TestAlarm, who: dict | None = Depends(user)) 
 
 
 @app.post("/api/coops/{coop_id}/alarms/{alarm_id}/resolve")
-def resolve_alarm(coop_id: str, alarm_id: str, who: dict | None = Depends(user)) -> dict:
-    coop_for(coop_id, who, write=True)
-    alarms.set_status(coop_id, alarm_id, "resolved")
+def resolve_alarm(coop_id: str, alarm_id: str, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "keeper")
+    alarms.set_status(coop_id, alarm_id, "resolved", who["uid"])
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ admin
+
+
+@app.get("/api/admin/overview")
+def admin_overview(who: dict = Depends(admin)) -> dict:
+    coops = [{"id": s.id, **s.to_dict()} for s in store.db().collection("coops").stream()]
+    users = store.all_users()
+    by_uid = {u["uid"]: u for u in users}
+    since = store.now() - timedelta(days=7)
+    coop_rows = []
+    for c in coops:
+        calls_7d = store.coop_ref(c["id"]).collection("calls").where(
+            filter=firestore.FieldFilter("ts", ">=", since)).count().get()[0][0].value
+        owner = by_uid.get(c.get("owner_uid"), {})
+        coop_rows.append({
+            "id": c["id"], "name": c.get("name"), "owner": owner.get("email") or c.get("owner_uid"),
+            "members": len(c.get("members", {})), "invites": len(c.get("invite_emails", [])),
+            "birds": c.get("birds_expected"),
+            "last_seen": timeline.ago(c["last_seen"]) if c.get("last_seen") else "never",
+            "open_alarms": len(alarms.open_alarms(c["id"])), "calls_7d": calls_7d,
+        })
+    member_counts: dict[str, int] = defaultdict(int)
+    for c in coops:
+        for uid in c.get("members", {}):
+            member_counts[uid] += 1
+    user_rows = sorted(({
+        "uid": u["uid"], "email": u.get("email"), "name": u.get("name"),
+        "coops": member_counts.get(u["uid"], 0), "blocked": bool(u.get("blocked")),
+        "admin": (u.get("email") or "") in config.ADMIN_EMAILS,
+        "first_seen": store.local(u["first_seen"]).strftime("%d %b %Y") if u.get("first_seen") else "",
+        "last_seen": timeline.ago(u["last_seen"]) if u.get("last_seen") else "",
+    } for u in users), key=lambda r: r["email"] or "")
+    days = []
+    for d in store.db().collection("usage").order_by("day", direction=firestore.Query.DESCENDING).limit(14).stream():
+        u = d.to_dict()
+        frames, secs = u.get("frames", 0), u.get("call_seconds", 0)
+        days.append({"day": u["day"], "frames": frames, "calls": u.get("calls", 0),
+                     "call_minutes": round(secs / 60, 1),
+                     "cost_usd": round(frames * config.GEMINI_USD_PER_FRAME
+                                       + secs / 3600 * config.ASSEMBLYAI_USD_PER_HOUR, 2)})
+    return {"coops": coop_rows, "users": user_rows, "usage": days[::-1]}
+
+
+class Block(BaseModel):
+    blocked: bool
+
+
+@app.post("/api/admin/users/{uid}/block")
+def admin_block(uid: str, body: Block, who: dict = Depends(admin)) -> dict:
+    if uid == who["uid"]:
+        raise HTTPException(400, "you cannot pause yourself")
+    store.set_blocked(uid, body.blocked)
+    _touched.pop(uid, None)
     return {"ok": True}
 
 
@@ -308,5 +537,4 @@ async def watch() -> None:
 
 @app.on_event("startup")
 async def start_watch() -> None:
-    if config.service_account() or config.FIREBASE_PROJECT:
-        asyncio.create_task(watch())
+    asyncio.create_task(watch())

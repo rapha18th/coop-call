@@ -96,14 +96,21 @@ export class CoopCall {
   private pending: { call_id: string; result: string }[] = []
   private youLevel = 0
   private coopLevel = 0
+  private callId = ''
+  private startedAt = 0
+  private transcript: { who: string; text: string }[] = []
+  private tools: string[] = []
+  private evidence = 0
+  private closed = false
 
   constructor(private coopId: string, private on: CallEvents) {}
 
   async start(alarmId?: string) {
     this.on.status('connecting')
     try {
-      const { token, session } = await post<{ token: string; session: any }>(
+      const { token, session, call_id } = await post<{ token: string; session: any; call_id: string }>(
         `/api/coops/${this.coopId}/call`, { alarm_id: alarmId ?? null })
+      this.callId = call_id
 
       this.capCtx = new AudioContext({ sampleRate: WIRE_RATE })
       this.playCtx = new AudioContext({ sampleRate: WIRE_RATE })
@@ -144,6 +151,7 @@ export class CoopCall {
     switch (msg.type) {
       case 'session.ready':
         this.ready = true
+        this.startedAt = Date.now()
         this.on.status('listening')
         break
       case 'input.speech.started':
@@ -169,12 +177,15 @@ export class CoopCall {
         this.on.line({ who: 'you', text: msg.text, partial: true })
         break
       case 'transcript.user':
+        this.transcript.push({ who: 'you', text: msg.text })
         this.on.line({ who: 'you', text: msg.text })
         break
       case 'transcript.agent':
+        this.transcript.push({ who: 'coop', text: msg.text })
         this.on.line({ who: 'coop', text: msg.text })
         break
       case 'tool.call':
+        this.tools.push(msg.name)
         this.on.status('thinking')
         this.runTool(msg.call_id, msg.name, msg.arguments ?? {})
         break
@@ -192,6 +203,7 @@ export class CoopCall {
     try {
       result = await api(`/api/coops/${this.coopId}/tools/${name}`, { method: 'POST', body: JSON.stringify(args) })
       if (result?.frame_url) {
+        this.evidence += 1
         this.on.evidence({ tool: name, frame_url: result.frame_url, time: result.time || result.frame_time,
           description: result.description || result.camera })
       }
@@ -222,7 +234,17 @@ export class CoopCall {
     this.cleanup('ended')
   }
 
+  private report() {
+    if (this.closed || !this.callId) return
+    this.closed = true
+    const duration_s = this.startedAt ? (Date.now() - this.startedAt) / 1000 : 0
+    post(`/api/coops/${this.coopId}/calls/${this.callId}/end`, {
+      duration_s, transcript: this.transcript.slice(-400), tools: this.tools, evidence: this.evidence,
+    }).catch(() => {})
+  }
+
   private cleanup(status: CallStatus, detail?: string) {
+    this.report()
     this.playback?.port.postMessage('stop')
     this.mic?.getTracks().forEach((t) => t.stop())
     this.capCtx?.close().catch(() => {})
