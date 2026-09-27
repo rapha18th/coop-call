@@ -16,7 +16,7 @@ Built for the AssemblyAI Voice Agent Hackathon, September 2026.
 
 ## A harness, not a wrapper
 
-The voice on the call is backed by a model of the broiler business, not a chat prompt.
+The voice on the call is backed by a working model of the broiler business.
 
 - **The flock.** Age, feed phase, birds alive, and estimated weight against the Cobb500 day-by-day curve, scaled by the farm's own weigh-ins.
 - **The feed.** What the birds should eat today in kilos and bags, what was bought, what is on hand, and how many days it lasts. The last two weeks before selling eat about two thirds of a 35-day batch's feed, and the coop says so before the cash is needed.
