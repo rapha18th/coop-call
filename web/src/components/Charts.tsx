@@ -6,9 +6,9 @@ import { useState, type ReactNode } from 'react'
 import { dayLabel, type Cell, type Day } from '../lib/api'
 
 export const STATE = {
-  fine: { color: '#c07e1c', label: 'Comfortable' },
-  cold: { color: '#4b8be6', label: 'Huddled (cold)' },
-  hot: { color: '#df5a32', label: 'Panting (hot)' },
+  fine: { color: 'var(--c-fine)', label: 'Comfortable' },
+  cold: { color: 'var(--c-cold)', label: 'Huddled (cold)' },
+  hot: { color: 'var(--c-hot)', label: 'Panting (hot)' },
   none: { color: 'transparent', label: 'No reading' },
 } as const
 

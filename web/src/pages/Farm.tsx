@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import type { User } from 'firebase/auth'
 import { DEMO_COOP, api, post, signIn, signOutNow, watchUser, type Card, type Me } from '../lib/api'
 import { FLOCK_DEFAULTS, FlockFields, flockBody, type FlockForm } from '../components/Flock'
+import { ThemeToggle } from '../components/Today'
 
 const WORDS: Record<string, string> = {
   even: 'spread out', huddled: 'huddled', crowded_feeder: 'at the feeder', crowded_drinker: 'at the drinker',
@@ -42,6 +43,7 @@ export default function Farm() {
         <Link to="/" className="mark">Coop Call</Link>
         <span className="name">Your farm</span>
         {me?.admin && <Link to="/admin" className="quiet-link">Admin</Link>}
+        <ThemeToggle />
         <button className="quiet-link" onClick={() => signOutNow().then(() => nav('/'))}>Sign out</button>
       </header>
 

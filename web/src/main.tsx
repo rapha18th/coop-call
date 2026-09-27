@@ -4,6 +4,9 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './styles.css'
 import './dashboard.css'
 import './flock.css'
+import './today.css'
+import './theme.css'
+import { applyTheme, currentTheme } from './lib/theme'
 import Landing from './pages/Landing'
 import CoopPage from './pages/Coop'
 import NodePage from './pages/Node'
@@ -11,6 +14,7 @@ import Farm from './pages/Farm'
 import Admin from './pages/Admin'
 import { registerWorker } from './lib/push'
 
+applyTheme(currentTheme())
 registerWorker().catch(() => {})
 
 createRoot(document.getElementById('root')!).render(

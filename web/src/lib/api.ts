@@ -78,7 +78,7 @@ export type Coop = { id: string; name: string; birds_expected?: number; owner_na
 
 export type State = {
   coop: Coop; role: string; now: Now; alarms: Alarm[]; strip: Hour[]; owner: boolean
-  device: Device; flock: Flock | null
+  device: Device; flock: Flock | null; today?: TodayData
 }
 
 export type Device = {
@@ -89,6 +89,26 @@ export type Device = {
 }
 
 export type Task = { when: string; kind: string; text: string }
+
+export type ActionButton = { label: string; do: 'call' | 'resolve' | 'open' | 'log' | 'form'; alarm?: string; sheet?: string; kind?: string; note?: string }
+export type Action = { id: string; tone: 'act' | 'watch'; title: string; detail: string; buttons: ActionButton[] }
+export type TodayData = { headline: { level: 'good' | 'watch' | 'act'; text: string }; actions: Action[]; care: Day }
+
+export type CalDay = {
+  date: string; age: number | null; future: boolean; today: boolean
+  tone: 'good' | 'watch' | 'act' | 'none' | 'future'; care: number | null
+  alarms: number; calls: number; records: string[]; plan: string[]
+}
+export type Month = { first: string; last: string; today: string; days: CalDay[] }
+export type Span = {
+  first: string; last: string; days: number; story: string; summary: Day; per_day: Day[]
+  grid: { day: string; hours: Cell[] }[]
+  alarms: { time: string; message: string; status: string }[]
+  calls: { time: string; name: string; duration_s?: number; said: string }[]
+  frames: { time: string; url: string | null; text: string }[]
+  flock: { age_from: number; age_to: number; weight_from: number; weight_to: number; feed_kg: number; feed_bags: number; feed_usd: number; plan: { date: string; what: string[] }[] } | null
+  records: { time: string; kind: string; quantity: number | null; unit: string; amount_usd: number | null; note: string }[]
+}
 
 export type PlanRow = {
   day: number; weight_kg: number; revenue: number; feed_to_buy: number; margin: number

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { User } from 'firebase/auth'
 import { DEMO_COOP, signIn, watchUser } from '../lib/api'
+import { ThemeToggle } from '../components/Today'
 
 export default function Landing() {
   const [user, setUser] = useState<User | null | undefined>(undefined)
@@ -12,6 +13,7 @@ export default function Landing() {
 
   return (
     <main className="landing">
+      <div style={{ position: 'fixed', top: 16, right: 16 }}><ThemeToggle /></div>
       <h1 className="wordmark">Coop Call</h1>
       <p className="tagline">Call your coop. It tells you what happened, what is happening, and what to change.</p>
 

@@ -1,0 +1,49 @@
+/* Chart colours are validated per theme: night on #15120e, day on #fffaf1. */
+:root {
+  --c-fine: #c07e1c;
+  --c-cold: #4b8be6;
+  --c-hot: #df5a32;
+  --tip-bg: #f4ede1;
+  --tip-ink: #1a140c;
+  --mark-edge: #15120e;
+  --glass: rgba(12, 10, 8, 0.78);
+}
+
+:root[data-theme='day'] {
+  color-scheme: light;
+  --night: #fbf6ec;
+  --night-2: #fffaf1;
+  --night-3: #f2e9d8;
+  --ink: #1f1a13;
+  --muted: #6f6556;
+  --faint: #a4988a;
+  --line: rgba(31, 26, 19, 0.1);
+  --lamp: #b8741a;
+  --lamp-soft: rgba(184, 116, 26, 0.14);
+  --ember: #c8431d;
+  --leaf: #4f7d2a;
+  --c-fine: #b8741a;
+  --c-cold: #2f6fd0;
+  --c-hot: #d2491f;
+  --tip-bg: #1f1a13;
+  --tip-ink: #fbf6ec;
+  --mark-edge: #fffaf1;
+  --glass: rgba(255, 250, 241, 0.86);
+}
+
+:root[data-theme='day'] body { background: var(--night); }
+:root[data-theme='day'] .landing { background: radial-gradient(ellipse 70% 50% at 50% 38%, rgba(242, 169, 59, 0.18), transparent 70%); }
+:root[data-theme='day'] .stage .caption { background: var(--glass); }
+:root[data-theme='day'] .tip { background: var(--tip-bg); color: var(--tip-ink); }
+:root[data-theme='day'] .lamp { box-shadow: 0 0 50px 8px rgba(242, 169, 59, 0.35), 0 12px 40px rgba(184, 116, 26, 0.25); }
+
+.tip { background: var(--tip-bg); color: var(--tip-ink); }
+.stage .caption { background: var(--glass); }
+.mk.water { background: var(--ink); box-shadow: 0 0 0 1.5px var(--mark-edge); }
+.mk.feed { background: var(--mark-edge); box-shadow: 0 0 0 1.5px var(--ink); }
+
+.themetoggle {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--line); background: var(--night-2); color: var(--muted); font-size: 14px;
+}
+.themetoggle:hover { color: var(--lamp); border-color: var(--lamp); }

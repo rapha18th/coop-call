@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import firestore
 from pydantic import BaseModel, Field
 
-from . import alarms, config, device, flock, metrics, store, timeline, vision, voice
+from . import alarms, batchcal, config, device, flock, metrics, store, timeline, today, vision, voice
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("coop")
@@ -276,16 +276,38 @@ def state(coop_id: str, who: dict | None = Depends(user)) -> dict:
         "agitated": timeline._frac(h, "agitated"), "sound": timeline._mean(h, "sound_db"),
         "notes": len(h.get("notes", [])), "simulated": bool(h.get("simulated")),
     } for h in hours]
+    st = flock.state(coop)
+    dev = device.health(coop)
+    open_alarms = alarms.open_alarms(coop_id)
+    acts = today.actions(coop, st, dev, open_alarms)
+    care = today._care_today(coop)
     return {
         "coop": _public(coop),
         "role": role,
-        "device": device.health(coop),
-        "flock": flock.state(coop),
+        "device": dev,
+        "flock": st,
+        "today": {"headline": today.headline(coop, st, care, dev, acts), "actions": acts, "care": care},
         "now": timeline.answer_now(coop_id),
-        "alarms": [_alarm_view(a) for a in alarms.open_alarms(coop_id)],
+        "alarms": [_alarm_view(a) for a in open_alarms],
         "strip": strip,
         "owner": role in ("owner", "admin"),
     }
+
+
+@app.get("/api/coops/{coop_id}/calendar")
+def coop_calendar(coop_id: str, who: dict | None = Depends(user)) -> dict:
+    coop, _ = access(coop_id, who)
+    return batchcal.month(coop)
+
+
+@app.get("/api/coops/{coop_id}/span")
+def coop_span(coop_id: str, first: str, last: str, who: dict | None = Depends(user)) -> dict:
+    coop, _ = access(coop_id, who)
+    from datetime import date as _date
+    try:
+        return batchcal.span(coop, _date.fromisoformat(first), _date.fromisoformat(last))
+    except ValueError:
+        raise HTTPException(400, "dates must look like 2026-09-27")
 
 
 @app.get("/api/coops/{coop_id}/metrics")

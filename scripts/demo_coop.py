@@ -44,8 +44,8 @@ def simulate(coop_id: str, hours: int, birds: int) -> None:
         lt = store.local(t)
         night = lt.hour >= 19 or lt.hour < 6
         # One cold spell before dawn, and a dry drinker mid-afternoon yesterday.
-        cold = lt.hour in (2, 3) and rng.random() < 0.8
-        dry = lt.hour == 15 and 5 <= lt.minute <= 45
+        cold = lt.hour in (2, 3) and rng.random() < 0.8 and lt.day % 3 != 0
+        dry = lt.hour == 15 and 5 <= lt.minute <= 45 and lt.day % 4 == 1
         obs = {
             "ts": t, "source": "vision", "simulated": True, "frame": None,
             "birds": birds - rng.randint(0, 3),
