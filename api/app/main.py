@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import firestore
 from pydantic import BaseModel, Field
 
-from . import alarms, config, metrics, store, timeline, vision, voice
+from . import alarms, config, device, flock, metrics, store, timeline, vision, voice
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("coop")
@@ -140,10 +140,28 @@ def _card(coop: dict, role: str) -> dict:
     }
 
 
+class Prices(BaseModel):
+    chick: float | None = Field(default=None, ge=0, le=20)
+    feed_per_kg: float | None = Field(default=None, ge=0, le=10)
+    sell_per_kg: float | None = Field(default=None, ge=0, le=50)
+    other_per_bird: float | None = Field(default=None, ge=0, le=20)
+
+
+class FlockSetup(BaseModel):
+    birds: int = Field(ge=1, le=100000)
+    age_days: int = Field(default=0, ge=0, le=70)
+    breed: str = "Cobb 500"
+    prices: Prices = Prices()
+    sell_day: int = Field(default=35, ge=28, le=56)
+
+
 class NewCoop(BaseModel):
     name: str = Field(min_length=1, max_length=40)
     birds: int = Field(ge=0, le=100000)
     age_days: int = Field(default=0, ge=0, le=1000)
+    breed: str = "Cobb 500"
+    prices: Prices = Prices()
+    sell_day: int = Field(default=35, ge=28, le=56)
 
 
 @app.get("/api/coops")
@@ -156,7 +174,71 @@ def my_coops(who: dict = Depends(signed_in)) -> list[dict]:
 def new_coop(body: NewCoop, who: dict = Depends(signed_in)) -> dict:
     coop, key = store.create_coop(who["uid"], body.name, who.get("name", ""), body.birds, body.age_days,
                                   owner_email=(who.get("email") or "").lower())
+    if body.birds:
+        flock.setup(coop["id"], body.birds, min(body.age_days, 70), body.breed,
+                    body.prices.model_dump(), body.sell_day)
     return {"coop": _public(coop), "node_key": key}
+
+
+@app.put("/api/coops/{coop_id}/flock")
+def setup_flock(coop_id: str, body: FlockSetup, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "owner")
+    return flock.setup(coop_id, body.birds, body.age_days, body.breed, body.prices.model_dump(), body.sell_day)
+
+
+class PriceEdit(BaseModel):
+    prices: Prices = Prices()
+    sell_day: int | None = Field(default=None, ge=28, le=56)
+
+
+@app.patch("/api/coops/{coop_id}/flock")
+def edit_flock(coop_id: str, body: PriceEdit, who: dict = Depends(signed_in)) -> dict:
+    coop, _ = access(coop_id, who, "owner")
+    if not coop.get("flock"):
+        raise HTTPException(400, "set up the flock first")
+    update = {f"flock.prices.{k}": v for k, v in body.prices.model_dump().items() if v is not None}
+    if body.sell_day:
+        update["flock.sell_day"] = body.sell_day
+    if update:
+        store.coop_ref(coop_id).update(update)
+    return {"ok": True}
+
+
+class Record(BaseModel):
+    kind: str
+    quantity: float | None = Field(default=None, ge=0, le=1_000_000)
+    amount_usd: float | None = Field(default=None, ge=0, le=10_000_000)
+    unit: str = ""
+    note: str = ""
+
+
+@app.get("/api/coops/{coop_id}/ledger")
+def get_ledger(coop_id: str, who: dict | None = Depends(user)) -> list[dict]:
+    coop, _ = access(coop_id, who)
+    if not coop.get("flock"):
+        return []
+    rows = flock.ledger(coop_id, coop["flock"]["batch"])
+    return [{**r, "ts": store.local(r["ts"]).strftime("%a %d %b %H:%M")} for r in reversed(rows)]
+
+
+@app.post("/api/coops/{coop_id}/ledger")
+def post_ledger(coop_id: str, body: Record, who: dict | None = Depends(user)) -> dict:
+    coop, role = access(coop_id, who, "keeper" if coop_id != config.DEMO_COOP_ID else "viewer")
+    if not coop.get("flock"):
+        raise HTTPException(400, "set up the flock first")
+    try:
+        row = flock.add_record(coop_id, coop["flock"]["batch"], body.kind, body.quantity, body.amount_usd,
+                               body.note, who["uid"] if who else None, body.unit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True, "id": row["id"]}
+
+
+@app.delete("/api/coops/{coop_id}/ledger/{row_id}")
+def delete_ledger(coop_id: str, row_id: str, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "keeper")
+    store.coop_ref(coop_id).collection("ledger").document(row_id).delete()
+    return {"ok": True}
 
 
 class CoopEdit(BaseModel):
@@ -197,6 +279,8 @@ def state(coop_id: str, who: dict | None = Depends(user)) -> dict:
     return {
         "coop": _public(coop),
         "role": role,
+        "device": device.health(coop),
+        "flock": flock.state(coop),
         "now": timeline.answer_now(coop_id),
         "alarms": [_alarm_view(a) for a in alarms.open_alarms(coop_id)],
         "strip": strip,
@@ -303,12 +387,20 @@ class Beat(BaseModel):
     motion: float | None = None
     battery: float | None = None
     charging: bool | None = None
+    network: str | None = None
+    sharpness: float | None = None
+    width: int | None = None
+    height: int | None = None
+    version: str | None = None
+    camera: str | None = None
 
 
 @app.post("/api/node/{coop_id}/beat")
 def beat(coop_id: str, body: Beat, x_node_key: str | None = Header(default=None)) -> dict:
     node_coop(coop_id, x_node_key)
-    timeline.record(coop_id, _sensor_obs(body.model_dump(), store.now()))
+    data = body.model_dump()
+    timeline.record(coop_id, _sensor_obs(data, store.now()))
+    device.record_beat(coop_id, data)
     return {"ok": True}
 
 
@@ -317,7 +409,9 @@ def frame(coop_id: str, image: UploadFile = File(...), sensors: str = Form("{}")
           x_node_key: str | None = Header(default=None)) -> dict:
     node_coop(coop_id, x_node_key)
     ts = store.now()
-    timeline.record(coop_id, _sensor_obs(json.loads(sensors or "{}"), ts))
+    readings = json.loads(sensors or "{}")
+    timeline.record(coop_id, _sensor_obs(readings, ts))
+    device.record_beat(coop_id, readings)
 
     since = time.time() - _last_vision.get(coop_id, 0)
     if since < config.MIN_VISION_INTERVAL_S:
@@ -332,7 +426,9 @@ def frame(coop_id: str, image: UploadFile = File(...), sensors: str = Form("{}")
         seen = vision.read_frame(jpeg)
     except Exception as exc:
         log.exception("vision failed")
+        device.record_frame(coop_id, False, str(exc))
         return {"analysed": False, "error": str(exc)[:200]}
+    device.record_frame(coop_id, True)
     store.bump_usage(frames=1)
     timeline.record(coop_id, {"ts": ts, "source": "vision", "simulated": False, "frame": path, **seen})
     alarms.evaluate(coop_id)
@@ -354,7 +450,8 @@ def call(coop_id: str, body: CallRequest, request: Request, who: dict | None = D
     if not config.ASSEMBLYAI_API_KEY:
         raise HTTPException(503, "voice is not configured")
     token = voice.mint_token()
-    session = voice.session(coop, body.alarm_id, who["uid"] if who else None)
+    session = voice.session(coop, body.alarm_id, who["uid"] if who else None,
+                            flock.briefing(flock.state(coop)), device.spoken(device.health(coop)))
     ref = store.coop_ref(coop_id).collection("calls").document()
     ref.set({"ts": store.now(), "uid": who["uid"] if who else None,
              "name": (who or {}).get("name") or ("Demo caller" if role == "public" else ""),
@@ -420,6 +517,42 @@ def tool(coop_id: str, name: str, args: dict, who: dict | None = Depends(user)) 
             w = metrics.week(coop, 7)
             return {"today": w["today"], "insights": [i["text"] for i in w["insights"]],
                     "flock": w["flock"], "alarms": w["alarms"]}
+        if name == "flock_status":
+            st = flock.state(coop)
+            if not st:
+                return {"note": "The flock has not been set up yet."}
+            out = {k: st[k] for k in ("age_days", "week", "phase", "phase_ends_in", "next_phase", "birds",
+                                      "water_l_today")}
+            out["growth"] = {k: v for k, v in st["growth"].items() if k not in ("curve", "weighs")}
+            out["feed"] = {k: v for k, v in st["feed"].items() if k != "weekly"}
+            out["feed_by_week"] = [{"week": w["week"], "bags": w["bags"], "usd": w["usd"]}
+                                   for w in st["feed"]["weekly"]]
+            out["money"] = {k: v for k, v in st["money"].items() if k != "plan"}
+            return out
+        if name == "sell_plan":
+            st = flock.state(coop)
+            if not st:
+                return {"note": "The flock has not been set up yet."}
+            plan = st["money"]["plan"]
+            wanted = {st["money"]["best_day"], args.get("day"), 32, 35, 38, 42}
+            return {"best_day": st["money"]["best_day"], "growth_basis": st["growth"]["factor_source"],
+                    "options": [r for r in plan if r["day"] in wanted], "prices": st["money"]["prices"]}
+        if name == "today_tasks":
+            st = flock.state(coop)
+            if not st:
+                return {"note": "No flock set up."}
+            return {"tasks": [t["text"] + " (" + t["when"] + ")" for t in st["tasks"]]}
+        if name == "device_status":
+            return device.health(coop)
+        if name == "log_record":
+            if RANK[role] < RANK["keeper"] and role != "public":
+                raise HTTPException(403, "needs a keeper")
+            if not coop.get("flock"):
+                return {"error": "Set up the flock first."}
+            row = flock.add_record(coop_id, coop["flock"]["batch"], args["kind"], args.get("quantity"),
+                                   args.get("amount_usd"), args.get("note", ""), who["uid"] if who else "voice",
+                                   args.get("unit", ""))
+            return {"saved": True, "id": row["id"], "kind": row["kind"]}
         if name == "resolve_alarm":
             if RANK[role] < RANK["keeper"] and role != "public":
                 raise HTTPException(403, "needs a keeper")

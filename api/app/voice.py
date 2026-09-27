@@ -12,6 +12,7 @@ VOICE = "anna"
 KEYTERMS = [
     "brooder", "drinker", "drinkers", "feeder", "broilers", "layers", "Newcastle",
     "coccidiosis", "gumboro", "vaccine", "litter", "chick", "chicks", "coop", "Ziso",
+    "starter", "grower", "finisher", "bags", "kilos", "Cobb", "Irvine's", "margin",
 ]
 
 TIME_ARGS = {
@@ -91,45 +92,107 @@ TOOLS = [
 ]
 
 
-def system_prompt(coop: dict, alarm: dict | None) -> str:
+BUSINESS_TOOLS = [
+    {
+        "type": "function",
+        "name": "flock_status",
+        "description": "The flock as a business: age, phase, birds alive and lost, estimated weight against the breed target, feed today in kg and bags, feed on hand and days it lasts, feed by week in bags and dollars, money spent so far. Use for any question about growth, feed, costs or how the batch is going.",
+        "parameters": {"type": "object", "properties": {}},
+        "execution_mode": "hold",
+        "timeout_seconds": 25,
+    },
+    {
+        "type": "function",
+        "name": "sell_plan",
+        "description": "Projected margin for selling on different days, the best day, and what one more day is worth (weight gained minus feed eaten). Use for when should I sell, is it worth waiting, what will I make.",
+        "parameters": {"type": "object", "properties": {
+            "day": {"type": "integer", "description": "A specific age in days the owner asks about, optional."}}},
+        "execution_mode": "hold",
+        "timeout_seconds": 25,
+    },
+    {
+        "type": "function",
+        "name": "today_tasks",
+        "description": "The routine for today at this age: vaccines due, feed phase changes, weighing, brooding temperature, lighting.",
+        "parameters": {"type": "object", "properties": {}},
+        "execution_mode": "hold",
+        "timeout_seconds": 20,
+    },
+    {
+        "type": "function",
+        "name": "device_status",
+        "description": "Health of the coop phone that watches the birds: online, battery, charging, network, whether the camera view is clear.",
+        "parameters": {"type": "object", "properties": {}},
+        "execution_mode": "hold",
+        "timeout_seconds": 20,
+    },
+    {
+        "type": "function",
+        "name": "log_record",
+        "description": "Save a farm record the owner tells you about. Read it back and get a yes before saving. Kinds: feed_bought (quantity in kg, a 50 kg bag is 50), deaths (number of birds), sold (number of birds, amount_usd received), weighed (average kg per bird), expense (amount_usd, note what for), vaccinated (note which vaccine), note.",
+        "parameters": {"type": "object", "properties": {
+            "kind": {"type": "string", "enum": ["feed_bought", "deaths", "sold", "weighed", "expense", "vaccinated", "note"]},
+            "quantity": {"type": "number"},
+            "unit": {"type": "string"},
+            "amount_usd": {"type": "number"},
+            "note": {"type": "string"}},
+            "required": ["kind"]},
+        "execution_mode": "interactive",
+        "timeout_seconds": 20,
+    },
+]
+TOOLS = TOOLS + BUSINESS_TOOLS
+
+
+def system_prompt(coop: dict, alarm: dict | None, briefing: str = "", device_text: str = "") -> str:
     now = store.local(store.now())
     lines = [
-        f"You are {coop['name']}, a poultry house, speaking on a phone call with its owner, "
-        f"{coop.get('owner_name') or 'the owner'}. You speak for the house in the first person plural "
-        "for the birds: we, our drinker, our feeder. You see through a phone camera and hear through its "
-        "microphone, and you remember everything as a timeline.",
+        f"You are {coop['name']}, a broiler house, on a call with its owner, "
+        f"{coop.get('owner_name') or 'the owner'}. Speak for the house and the birds in the first person "
+        "plural: we, our drinker. You see through a phone camera, you remember everything as a timeline, "
+        "and you keep the farm's books.",
         f"The local time is {now.strftime('%A %d %B %Y, %H:%M')} (Central Africa Time).",
-        f"The flock should be about {coop.get('birds_expected', 'an unknown number of')} birds.",
-        "Always answer from your tools, never from imagination. Any question about the past, even one word "
-        "like yesterday or last night, needs coop_period for that window; coop_alarms only lists alarms still "
-        "open. Give times and numbers. When you describe "
-        "something visible, also call show_picture so the owner sees the evidence. If a tool says demo data, "
-        "you may still answer.",
-        "Keep every reply to one to three short spoken sentences. No lists, no formatting, no exclamation "
-        "marks. Plain English that a farmer in Zimbabwe or South Africa uses.",
-        "You watch and report. You are not a vet. For illness, deaths or a bird lying still, say what you "
-        "see and suggest calling a vet or extension officer. Suggest practical fixes: refill the drinker, "
-        "check the brooder heat, open a vent.",
+        "Briefing, true as of this call: " + briefing,
+        device_text,
+        "How you work. Answer from tools, never from imagination. Questions about the past need coop_period "
+        "for that window. Questions about growth, feed, cost or money need flock_status. Questions about "
+        "when to sell need sell_plan. Questions about what to do need today_tasks. When you describe "
+        "something visible, call show_picture so the owner sees the evidence.",
+        "Think like a good farm manager. Tie what you see to money: a dry drinker costs growth, cold nights "
+        "cost feed. Feed is most of the cost, and weeks five and six eat more than half of it, so warn early "
+        "when feed on hand runs short and when each extra day stops paying for itself. If the owner has not "
+        "weighed birds recently, suggest weighing ten, since every projection rests on it. When you name a sell "
+        "day, give the reason in one clause, for example that the birds are behind target so each day still adds "
+        "more weight than it costs in feed.",
+        "When the owner tells you something that happened (bought feed, birds died, sold birds, weighed "
+        "birds, vaccinated), offer to record it. Read the record back in one sentence and save it with "
+        "log_record only after a yes.",
+        "Keep every reply to one to three short spoken sentences. Round numbers. Say dollars, not USD. No "
+        "lists, no formatting, no exclamation marks. Plain English for a farmer in Zimbabwe or South Africa.",
+        "You are not a vet. For illness, deaths or a bird lying still, say what you see and suggest the vet "
+        "or an extension officer. Prices and targets are estimates; say so when the owner makes a big "
+        "decision on them.",
     ]
     if alarm:
         lines.append(f"You called the owner because of an alarm (id {alarm['id']}): {alarm['message']} "
-                     "Open with that, show the picture, then answer questions. When the owner says it is "
-                     "handled, call resolve_alarm.")
-    return "\n\n".join(lines)
+                     "Open with that, show the picture, say what it costs if left, then answer questions. "
+                     "When the owner says it is handled, call resolve_alarm.")
+    return "\n\n".join(l for l in lines if l)
 
 
 def greeting(coop: dict, alarm: dict | None) -> str:
     if alarm:
         return f"Hello, it's {coop['name']}. {alarm['message']} Shall I show you?"
-    return f"Hello, it's {coop['name']}. Ask me anything about the birds."
+    return f"Hello, it's {coop['name']}. Ask me about the birds, the feed, or the money."
 
 
-def session(coop: dict, alarm_id: str | None, by: str | None = None) -> dict:
+def session(coop: dict, alarm_id: str | None, by: str | None = None, briefing: str = "",
+            device_text: str = "") -> dict:
     alarm = alarms.get_alarm(coop["id"], alarm_id) if alarm_id else None
     if alarm and alarm["status"] == "ringing":
         alarms.set_status(coop["id"], alarm["id"], "answered", by)
     return {
-        "system_prompt": system_prompt(coop, alarm),
+        "system_prompt": system_prompt(coop, alarm, briefing, device_text),
         "greeting": greeting(coop, alarm),
         "tools": TOOLS,
         "input": {"keyterms": KEYTERMS, "language_codes": ["en"]},

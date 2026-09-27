@@ -76,7 +76,57 @@ export type Hour = {
 
 export type Coop = { id: string; name: string; birds_expected?: number; owner_name?: string }
 
-export type State = { coop: Coop; role: string; now: Now; alarms: Alarm[]; strip: Hour[]; owner: boolean }
+export type State = {
+  coop: Coop; role: string; now: Now; alarms: Alarm[]; strip: Hour[]; owner: boolean
+  device: Device; flock: Flock | null
+}
+
+export type Device = {
+  level: 'ok' | 'warn' | 'down'; summary: string
+  checks: { name: string; level: 'ok' | 'warn' | 'down'; text: string }[]
+  battery: number | null; charging: boolean | null; network: string | null; frames: number
+  resolution: string | null; version: string | null
+}
+
+export type Task = { when: string; kind: string; text: string }
+
+export type PlanRow = {
+  day: number; weight_kg: number; revenue: number; feed_to_buy: number; margin: number
+  margin_per_bird: number | null; extra_day_value: number
+}
+
+export type Flock = {
+  batch: string; placed: string; breed: string; age_days: number; week: number; phase: string
+  phase_ends_in: number | null; next_phase: string | null
+  birds: { placed: number; alive: number; deaths: number; sold: number; mortality_pct: number }
+  growth: {
+    target_kg: number; estimate_kg: number; factor: number; factor_source: string
+    measured: { kg: number; day: number; target_kg: number } | null
+    curve: { day: number; target_kg: number }[]; weighs: { day: number; kg: number }[]
+  }
+  feed: {
+    today_kg: number; today_bags: number; per_bird_g: number; bought_kg: number; eaten_kg: number
+    on_hand_kg: number | null; days_left: number | null; last_two_weeks_share: number; last_two_weeks_usd: number
+    sell_day: number
+    weekly: { week: number; kg_per_bird: number; kg: number; usd: number; bags: number; now: boolean }[]
+  }
+  water_l_today: number
+  money: {
+    spent: number; income: number; cost_per_bird_so_far: number | null; plan: PlanRow[]
+    best_day: number | null; chosen: PlanRow | null
+    prices: { chick: number; feed_per_kg: number; sell_per_kg: number; other_per_bird: number }
+  }
+  tasks: Task[]
+}
+
+export type LedgerRow = {
+  id: string; ts: string; kind: string; quantity: number | null; unit: string
+  amount_usd: number | null; note: string
+}
+
+export const usd = (v?: number | null, places = 0) =>
+  v == null ? '–' : `${v < 0 ? '−' : ''}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: places, maximumFractionDigits: places })}`
+
 
 export type Me = { uid: string; email: string; name: string; admin: boolean }
 
@@ -124,6 +174,8 @@ export type AdminOverview = {
 }
 
 export const del = <T = any>(path: string) => api<T>(path, { method: 'DELETE' })
+export const put = <T = any>(path: string, body: unknown) =>
+  api<T>(path, { method: 'PUT', body: JSON.stringify(body) })
 export const patch = <T = any>(path: string, body: unknown) =>
   api<T>(path, { method: 'PATCH', body: JSON.stringify(body) })
 

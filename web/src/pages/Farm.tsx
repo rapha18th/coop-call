@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { User } from 'firebase/auth'
 import { DEMO_COOP, api, post, signIn, signOutNow, watchUser, type Card, type Me } from '../lib/api'
+import { FLOCK_DEFAULTS, FlockFields, flockBody, type FlockForm } from '../components/Flock'
 
 const WORDS: Record<string, string> = {
   even: 'spread out', huddled: 'huddled', crowded_feeder: 'at the feeder', crowded_drinker: 'at the drinker',
@@ -80,8 +81,7 @@ export default function Farm() {
 function NewCoop({ onMade }: { onMade: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
-  const [birds, setBirds] = useState('50')
-  const [age, setAge] = useState('0')
+  const [flock, setFlock] = useState<FlockForm>(FLOCK_DEFAULTS)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -89,7 +89,7 @@ function NewCoop({ onMade }: { onMade: (id: string) => void }) {
     e.preventDefault()
     setBusy(true)
     try {
-      const { coop, node_key } = await post('/api/coops', { name, birds: Number(birds), age_days: Number(age) })
+      const { coop, node_key } = await post('/api/coops', { name, ...flockBody(flock) })
       sessionStorage.setItem(`node-key:${coop.id}`, node_key)
       onMade(coop.id)
     } catch (err: any) {
@@ -112,17 +112,8 @@ function NewCoop({ onMade }: { onMade: (id: string) => void }) {
         <span className="note">Name</span>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="The hen house" required maxLength={40} autoFocus />
       </label>
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
-          <span className="note">Birds</span>
-          <input value={birds} onChange={(e) => setBirds(e.target.value)} inputMode="numeric" required />
-        </label>
-        <label className="field" style={{ flex: 1 }}>
-          <span className="note">Age in days</span>
-          <input value={age} onChange={(e) => setAge(e.target.value)} inputMode="numeric" required />
-        </label>
-      </div>
-      <button className="btn primary" disabled={busy || !name}>Create and pair a phone</button>
+      <FlockFields v={flock} set={setFlock} />
+      <button className="btn primary" style={{ marginTop: 12 }} disabled={busy || !name}>Create and pair a phone</button>
       {error && <p className="error">{error}</p>}
     </form>
   )

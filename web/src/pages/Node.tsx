@@ -88,6 +88,15 @@ export default function NodePage() {
         if (prev) diff += Math.abs(g - (prev[i] + prev[i + 1] + prev[i + 2]) / 3)
       }
       const n = px.length / 4
+      // Sharpness: mean difference between horizontal neighbours. A blocked or smeared lens reads low.
+      let edge = 0
+      for (let y = 0; y < 48; y++) {
+        for (let x = 1; x < 64; x++) {
+          const i = (y * 64 + x) * 4
+          edge += Math.abs((px[i] + px[i + 1] + px[i + 2]) - (px[i - 4] + px[i - 3] + px[i - 2])) / 3
+        }
+      }
+      const sharpness = edge / (48 * 63)
       prev = new Uint8ClampedArray(px)
       const brightness = light / n
       const motion = diff / n
@@ -105,9 +114,15 @@ export default function NodePage() {
       const sensors = {
         brightness,
         motion,
+        sharpness,
         sound_db: sound,
         battery: battery?.level ?? null,
         charging: battery?.charging ?? null,
+        network: (navigator as any).connection?.effectiveType ?? null,
+        width: v.videoWidth || null,
+        height: v.videoHeight || null,
+        camera: stream ? 'on' : 'file',
+        version: '0.3',
       }
       setStats((s) => ({ ...s, motion: Math.round(motion * 10) / 10, sound: Math.round(sound ?? 0), light: Math.round(brightness) }))
 

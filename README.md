@@ -14,6 +14,21 @@ Built for the AssemblyAI Voice Agent Hackathon, September 2026.
 4. **Talk.** "Call the coop" opens a live voice session with AssemblyAI's Voice Agent API. The agent answers from the timeline through tools (`coop_now`, `coop_period`, `coop_vs_normal`, `show_picture`, `coop_alarms`, `resolve_alarm`), and every picture it cites appears on screen as evidence.
 5. **Push.** Two readings in a row of an empty drinker, a huddled flock, heat stress, or anything unusual raise an alarm. The coop rings the owner's phone with a Web Push notification styled as an incoming call. Answering opens the call with the alarm already loaded. It rings again every three minutes until someone answers.
 
+## A harness, not a wrapper
+
+The voice on the call is backed by a model of the broiler business, not a chat prompt.
+
+- **The flock.** Age, feed phase, birds alive, and estimated weight against the Cobb500 day-by-day curve, scaled by the farm's own weigh-ins.
+- **The feed.** What the birds should eat today in kilos and bags, what was bought, what is on hand, and how many days it lasts. The last two weeks before selling eat about two thirds of a 35-day batch's feed, and the coop says so before the cash is needed.
+- **The money.** Spend to date and a projected margin for every sell day from 30 to 49, including what one more day is worth (weight gained minus feed eaten).
+- **The routine.** Vaccines due, feed phase switches, weigh days, brooding temperature and lighting for today's age.
+- **The records.** Tell the coop "I bought ten bags of finisher for 310 dollars" and it reads the record back, waits for a yes, and books it.
+- **The phone.** Battery, charging, network, whether the view is clear or blocked, and whether pictures are being read.
+
+Every call starts with a briefing built from all of the above. Twelve tools let the agent look deeper while it talks.
+
+Growth and feed targets: Cobb500 Broiler Performance and Nutrition Supplement (2022). Default prices are Zimbabwe figures from September 2026 and are editable per flock.
+
 ## Layout
 
 ```

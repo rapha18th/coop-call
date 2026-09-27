@@ -6,6 +6,9 @@ import { DEMO_COOP, api, post, signIn, watchUser, type Alarm, type State } from 
 import { CoopCall, type CallStatus, type Evidence } from '../lib/call'
 import { letCoopCall, pushSupported } from '../lib/push'
 import { Calls, Metrics, TeamPanel } from '../components/Panels'
+import { FlockCard, Growth, MoneyCard, NeedsYou, Records, Routine, Section, SellPlan, SetupFlock } from '../components/Flock'
+import { DeviceDetail, DevicePill } from '../components/Device'
+import { usd } from '../lib/api'
 
 const STATUS_WORDS: Record<CallStatus, string> = {
   idle: '',
@@ -33,6 +36,12 @@ export default function CoopPage() {
   const [evidence, setEvidence] = useState<Evidence | null>(null)
   const [ringing, setRinging] = useState(Boolean(incomingAlarm))
   const [refreshKey, setRefreshKey] = useState(0)
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
+  const reveal = (k: string) => {
+    setOpen((o) => ({ ...o, [k]: true }))
+    setTimeout(() => document.getElementById(k)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
   const call = useRef<CoopCall | null>(null)
   const live = status === 'connecting' || status === 'listening' || status === 'thinking' || status === 'speaking'
 
@@ -78,6 +87,10 @@ export default function CoopPage() {
   const frameTime = evidence?.time ?? state?.now.frame_time
   const frameText = evidence?.description ?? state?.now.camera
 
+  const f = state?.flock ?? null
+  const canWrite = !!state && ['owner', 'keeper', 'admin', 'public'].includes(state.role)
+  const manage = !!state && ['owner', 'admin'].includes(state.role)
+
   return (
     <div className="shell">
       <header className="top">
@@ -86,14 +99,15 @@ export default function CoopPage() {
           {state?.coop.name ?? ' '}
           {state?.now.note && <span className="badge">{state.now.note}</span>}
         </span>
+        {state?.device && <DevicePill d={state.device} onOpen={() => reveal('phone')} />}
         {user && <Link to="/farm" className="quiet-link">Your farm</Link>}
         {user === null && <button className="quiet-link" onClick={() => signIn()}>Sign in</button>}
       </header>
 
       {loadError && !state && <p className="error">{loadError}</p>}
 
-      <div className="grid">
-        <section>
+      <div className="glance">
+        <section className="stagecol">
           <div className="stage">
             {frame ? <img src={frame} alt="The coop" /> : <div className="empty">No picture yet. Pair a phone to give the coop its eyes.</div>}
             {evidence && <span className="evidence-tag">Evidence</span>}
@@ -118,39 +132,78 @@ export default function CoopPage() {
               {you && <span className="you">You: {you}</span>}
               {coopSaid && <span className="coop">{coopSaid}</span>}
               {!you && !coopSaid && !live && (
-                <span className="note">Try: How did the birds sleep? Is the water okay? Show me the drinker.</span>
+                <span className="note">Try: How did they sleep? When should I sell? I bought ten bags of finisher.</span>
               )}
             </div>
           </div>
         </section>
 
-        <aside>
-          <div className="panel">
-            <div className="label">Now · {state?.now.local_time ?? ''}</div>
-            <p className="now-text" style={{ marginTop: 8 }}>{state?.now.camera ?? 'Loading the coop.'}</p>
-            {state?.now.sensors && <p className="now-sub">{state.now.sensors}</p>}
-          </div>
-
-          {!!state?.alarms.length && (
-            <div className="panel">
-              <div className="label" style={{ marginBottom: 6 }}>Needs you</div>
-              {state.alarms.map((a) => (
-                <AlarmRow key={a.id} alarm={a} onAnswer={() => startCall(a.id)} />
-              ))}
-            </div>
+        <aside className="glancecol">
+          {f ? (
+            <>
+              <FlockCard f={f} />
+              <MoneyCard f={f} />
+            </>
+          ) : manage ? (
+            <SetupFlock coopId={coopId} onDone={refresh} />
+          ) : (
+            <div className="panel"><p className="note">The owner has not set up this flock yet.</p></div>
           )}
-
-          {state && ['owner', 'keeper', 'admin'].includes(state.role) && (
-            <OwnerTools coopId={coopId} canPair={state.owner} onChange={refresh} />
+          {state && <NeedsYou tasks={f?.tasks ?? []} alarms={state.alarms} />}
+          {!!state?.alarms.length && (
+            <div className="row">
+              {state.alarms.map((a) => <button key={a.id} className="btn" onClick={() => startCall(a.id)}>Ask about: {a.kind.replace('_', ' ')}</button>)}
+            </div>
           )}
         </aside>
       </div>
 
-      <Metrics coopId={coopId} refreshKey={refreshKey} />
-
-      <div className="grid lower">
-        <Calls coopId={coopId} refreshKey={refreshKey} />
-        {user && state && state.role !== 'public' && <TeamPanel coopId={coopId} />}
+      <div className="mores">
+        {f && (
+          <>
+            <Section id="growth" title="Growth and feed" open={!!open.growth} onToggle={() => toggle('growth')}
+              summary={`${f.growth.estimate_kg.toFixed(2)} kg a bird · ${f.feed.days_left != null ? `feed lasts ${f.feed.days_left} days` : `${f.feed.today_kg} kg today`}`}>
+              <Growth f={f} />
+            </Section>
+            <Section id="sell" title="When to sell" open={!!open.sell} onToggle={() => toggle('sell')}
+              summary={`best day ${f.money.best_day} · ${usd(f.money.plan.find((r) => r.day === f.money.best_day)?.margin)}`}>
+              <SellPlan coopId={coopId} f={f} canEdit={manage} onSaved={refresh} />
+            </Section>
+          </>
+        )}
+        <Section id="care" title="Care and comfort" open={!!open.care} onToggle={() => toggle('care')}
+          summary="care score, water, comfort, the week hour by hour">
+          <Metrics coopId={coopId} refreshKey={refreshKey} />
+        </Section>
+        {f && (
+          <>
+            <Section id="records" title="Records" open={!!open.records} onToggle={() => toggle('records')}
+              summary={`${usd(f.money.spent)} spent · ${f.birds.deaths} lost · ${f.feed.bought_kg} kg feed bought`}>
+              <Records coopId={coopId} canWrite={canWrite} onChange={refresh} />
+            </Section>
+            <Section id="routine" title="Daily routine" open={!!open.routine} onToggle={() => toggle('routine')}
+              summary={`day ${f.age_days} · ${f.phase.toLowerCase()} feed`}>
+              <Routine f={f} />
+            </Section>
+          </>
+        )}
+        <Section id="calls" title="Calls" open={!!open.calls} onToggle={() => toggle('calls')} summary="what was asked, what the coop said">
+          <Calls coopId={coopId} refreshKey={refreshKey} />
+        </Section>
+        {user && state && state.role !== 'public' && (
+          <Section id="team" title="Team" open={!!open.team} onToggle={() => toggle('team')} summary="who can call, who gets rung">
+            <TeamPanel coopId={coopId} />
+          </Section>
+        )}
+        {state?.device && (
+          <Section id="phone" title="Coop phone" open={!!open.phone} onToggle={() => toggle('phone')} summary={state.device.summary}>
+            <DeviceDetail d={state.device} />
+            {state.now.sensors && <p className="note">{state.now.sensors}</p>}
+            {['owner', 'keeper', 'admin'].includes(state.role) && (
+              <OwnerTools coopId={coopId} canPair={state.owner} onChange={refresh} />
+            )}
+          </Section>
+        )}
       </div>
 
       {ringing && incomingAlarm && (

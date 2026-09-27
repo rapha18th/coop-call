@@ -14,17 +14,10 @@ export function Metrics({ coopId, refreshKey }: { coopId: string; refreshKey: nu
   if (error) return <p className="error">{error}</p>
   if (!week) return <p className="note">Reading the week.</p>
   const t = week.today
-  const expected = week.flock.expected
 
   return (
     <section className="metrics">
-      <div className="section-head">
-        <h2>Today</h2>
-        <span className="note">
-          Week {week.flock.week_of_life} of life · day {week.flock.age_days}
-          {t.simulated && <span className="badge">demo data</span>}
-        </span>
-      </div>
+      {t.simulated && <p className="note" style={{ marginTop: 0 }}>Readings in this section are demo data.</p>}
 
       <div className="tiles">
         <div className="tile hero" title={`Care score: water ${week.care_weights.water * 100}%, comfort ${week.care_weights.comfort * 100}%, feed ${week.care_weights.feed * 100}%, calm nights ${week.care_weights.calm_nights * 100}%`}>
@@ -36,7 +29,7 @@ export function Metrics({ coopId, refreshKey }: { coopId: string; refreshKey: nu
         <Tile label="Feed" value={pct(t.feed_ok)} sub={t.empty_feeder_minutes ? `empty about ${t.empty_feeder_minutes} min` : 'of checks not low'} warn={(t.feed_ok ?? 1) < 0.8} />
         <Tile label="Comfort" value={pct(t.comfort)} sub={`cold ${pct(t.cold)} · hot ${pct(t.hot)}`} warn={(t.comfort ?? 1) < 0.7} />
         <Tile label="Calm nights" value={pct(t.calm_nights)} sub="not agitated after dark" warn={(t.calm_nights ?? 1) < 0.8} />
-        <Tile label="Birds seen" value={t.birds_max != null ? String(t.birds_max) : '–'} sub={expected ? `of ${expected} expected` : 'most at once'} warn={!!expected && (t.birds_max ?? 0) < 0.85 * expected} />
+        <Tile label="Birds in view" value={t.birds_max != null ? String(t.birds_max) : '–'} sub="most at once today" />
         <Tile label="Camera" value={`${t.coverage_h}h`} sub="of today watched" warn={t.coverage_h < 12} />
         <Tile label="Alarms" value={String(week.alarms.count)} sub={week.alarms.median_answer_min != null ? `answered in ${week.alarms.median_answer_min} min` : 'this week'} />
       </div>

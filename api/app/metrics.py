@@ -106,11 +106,11 @@ def insights(coop: dict, days: list[list[dict]], today: dict) -> list[dict]:
             out.append({"kind": "feed", "level": "watch",
                         "text": f"The feeder runs low around {_span(feed)}. Fill it later in the evening "
                                 "or add a second feeder."})
-        expected = coop.get("birds_expected") or 0
-        if expected and today.get("birds_max", 0) < 0.85 * expected:
+        usual = sorted(d.get("birds_max", 0) for d in (_day(h) for h in days[-4:-1]) if d.get("readings"))
+        if usual and today.get("birds_max", 0) < 0.85 * usual[len(usual) // 2]:
             out.append({"kind": "count", "level": "watch",
-                        "text": f"At most {today['birds_max']} of {expected} birds were visible today. "
-                                "Birds may be out of view, or missing. Worth a head count."})
+                        "text": f"At most {today['birds_max']} birds were in view today against a usual "
+                                f"{usual[len(usual) // 2]}. Birds may be sick in a corner, or missing. Worth a head count."})
         if today.get("coverage_h", 0) < 12:
             out.append({"kind": "coverage", "level": "watch",
                         "text": f"The camera saw only {today['coverage_h']} hours today. "
