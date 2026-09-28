@@ -78,6 +78,8 @@ export default function CoopPage() {
       status: (s, d) => {
         setStatus(s)
         if (d) setDetail(d)
+        // The agent's words arrive when it finishes speaking; clear the last line as it starts.
+        if (s === 'speaking') setCoopSaid('')
         if (s === 'ended' || s === 'error') {
           refresh()
           setTimeout(() => setRefreshKey((k) => k + 1), 1500)
