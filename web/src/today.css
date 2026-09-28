@@ -9,11 +9,15 @@
 @media (max-width: 900px) { .today { grid-template-columns: 1fr; } }
 .todaycol { display: flex; flex-direction: column; gap: 18px; }
 
-/* the status, the one thing to read */
+/* the status, the one thing to read, with the four numbers at its foot */
 .status-card {
+  display: flex; flex-direction: column; width: 100%;
+  border-radius: 22px; border: 1px solid var(--line); background: var(--night-2);
+  position: relative; overflow: hidden; transition: border-color 0.25s ease;
+}
+.status-main {
   display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left; width: 100%;
-  padding: 26px 28px 22px; border-radius: 22px; border: 1px solid var(--line); background: var(--night-2);
-  position: relative; overflow: hidden; transition: transform 0.25s ease, border-color 0.25s ease;
+  padding: 26px 28px 20px; position: relative; z-index: 1;
 }
 .status-card::before {
   content: ''; position: absolute; inset: auto -20% -60% auto; width: 70%; aspect-ratio: 1; border-radius: 50%;
@@ -21,7 +25,7 @@
 }
 .status-card.watch { --glow: rgba(242, 169, 59, 0.24); }
 .status-card.act { --glow: rgba(223, 90, 50, 0.22); border-color: rgba(223, 90, 50, 0.35); }
-.status-card:hover { transform: translateY(-2px); border-color: rgba(242, 169, 59, 0.45); }
+.status-card:has(.status-main:hover) { border-color: rgba(242, 169, 59, 0.45); }
 .status-card .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 10px var(--leaf); }
 .status-card.watch .pulse { background: var(--lamp); box-shadow: 0 0 10px var(--lamp); }
 .status-card.act .pulse { background: var(--ember); box-shadow: 0 0 10px var(--ember); animation: breathe-dot 1.6s infinite; }
@@ -29,7 +33,7 @@
 .status-card .headline { font-family: var(--display); font-size: clamp(22px, 2.3vw, 28px); line-height: 1.22; max-width: 26ch; color: var(--ink); }
 .status-card .open { margin-top: 6px; font-size: 13px; color: var(--muted); }
 .status-card .open b { color: var(--lamp); font-weight: 400; transition: margin 0.2s; }
-.status-card:hover .open b { margin-left: 4px; }
+.status-main:hover .open b { margin-left: 4px; }
 
 /* to do */
 .actions { display: flex; flex-direction: column; gap: 10px; }
@@ -52,18 +56,26 @@
 .eyecol .callbox { margin-top: -64px; position: relative; z-index: 2; padding-top: 0; }
 .eyecol .lamp { border: 6px solid var(--night); }
 
-/* the numbers */
-.vitals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 30px; }
-@media (max-width: 760px) { .vitals { grid-template-columns: repeat(2, 1fr); } }
-.vital { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 18px 20px; border-radius: 16px; border: 1px solid var(--line); background: var(--night-2); text-align: left; transition: border-color 0.2s, transform 0.2s; }
-.vital:hover { border-color: rgba(242, 169, 59, 0.5); transform: translateY(-1px); }
-.vital .v { font-family: var(--display); font-size: 38px; line-height: 1; }
-.vital .sub { font-size: 12px; color: var(--muted); }
+/* the numbers, a hairline row inside the today card */
+.vitals { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); position: relative; z-index: 1; }
+.vital { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 14px 18px 16px; text-align: left; min-width: 0; transition: background 0.2s; }
+.vital + .vital { border-left: 1px solid var(--line); }
+.vital:hover { background: var(--lamp-soft); }
+.vital .eyebrow { font-size: 9.5px; letter-spacing: 0.16em; white-space: nowrap; }
+.status-card .vital .v { font-family: var(--display); font-size: 26px; line-height: 1; white-space: nowrap; }
+.vital .sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .vital.warn .v { color: var(--ember); }
+@media (max-width: 560px) {
+  .vitals { grid-template-columns: repeat(2, 1fr); }
+  .vital:nth-child(3) { border-left: 0; }
+  .vital:nth-child(n + 3) { border-top: 1px solid var(--line); }
+}
 
-.dock { display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; margin: 28px auto 0; padding: 6px; border-radius: 99px; border: 1px solid var(--line); background: var(--night-2); width: max-content; max-width: 100%; }
-.dock button { padding: 8px 16px; border-radius: 99px; font-size: 13px; color: var(--muted); }
-.dock button:hover { background: var(--night-3); color: var(--ink); }
+/* the tabs, in the header */
+.tabs { display: flex; gap: 2px; padding: 4px; border-radius: 99px; border: 1px solid var(--line); background: var(--night-2); flex-shrink: 0; }
+.tabs button { padding: 6px 13px; border-radius: 99px; font-size: 13px; color: var(--muted); white-space: nowrap; transition: background 0.15s, color 0.15s; }
+.tabs button:hover { color: var(--ink); }
+.tabs button.on { background: var(--night-3); color: var(--ink); }
 
 /* sheets */
 .scrim { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(6px); display: flex; align-items: flex-end; justify-content: center; animation: fade 0.18s ease; }
@@ -161,3 +173,31 @@
 .source { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--night-2); margin-bottom: 14px; }
 .source strong { font-size: 18px; font-weight: 650; }
 .source.none strong { color: var(--ember); }
+
+/* one screen on a desktop: header, then today and the eye filling the window */
+.coop .bar .devpill { max-width: 230px; }
+@media (min-width: 901px) and (min-height: 620px) {
+  .shell.coop { max-width: 1320px; height: 100svh; display: flex; flex-direction: column; padding: 14px 28px 18px; overflow: hidden; }
+  .coop .bar { padding: 0 0 14px; flex-shrink: 0; }
+  .today { flex: 1; min-height: 0; align-items: stretch; grid-template-columns: 1.08fr 1fr; }
+  .todaycol { min-height: 0; overflow-y: auto; scrollbar-width: none; }
+  .todaycol::-webkit-scrollbar { display: none; }
+  .status-card .dayno { font-size: clamp(52px, min(7.4vw, 10.5vh), 96px); }
+  .status-card .headline { font-size: clamp(18px, min(1.9vw, 2.8vh), 25px); }
+  .eyecol { display: flex; flex-direction: column; min-height: 0; }
+  .eyecol .stage { flex: 1; min-height: 0; aspect-ratio: auto; }
+  .eyecol .callbox { gap: 12px; }
+  .eyecol .lamp:not(.small) { width: clamp(118px, 17vh, 160px); height: clamp(118px, 17vh, 160px); }
+  .eyecol .said { min-height: 0; }
+}
+@media (max-width: 1180px) and (min-width: 901px) {
+
+  .coop .bar .devpill .bits { display: none; }
+}
+
+/* on a phone the tabs take their own row and slide */
+@media (max-width: 900px) {
+  .coop .bar { flex-wrap: wrap; }
+  .coop .bar .tabs { order: 10; width: 100%; overflow-x: auto; scrollbar-width: none; justify-content: flex-start; }
+  .coop .bar .tabs::-webkit-scrollbar { display: none; }
+}

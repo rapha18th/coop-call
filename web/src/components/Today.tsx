@@ -25,15 +25,20 @@ export function ThemeToggle() {
 
 const TODAY_LABEL = () => new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
-export function StatusCard({ today, flock, onOpen }: { today?: TodayData; flock: Flock | null; onOpen: () => void }) {
+export function StatusCard({ today, flock, onOpen, onSheet }: {
+  today?: TodayData; flock: Flock | null; onOpen: () => void; onSheet: (sheet: string) => void
+}) {
   const level = today?.headline.level ?? 'good'
   return (
-    <button className={`status-card ${level}`} onClick={onOpen}>
-      <span className="eyebrow"><i className="pulse" />{TODAY_LABEL()}</span>
-      {flock ? <span className="dayno">Day {flock.age_days}</span> : <span className="dayno">Today</span>}
-      <span className="headline">{today?.headline.text ?? 'Reading the coop.'}</span>
-      <span className="open">See the whole batch <b>→</b></span>
-    </button>
+    <div className={`status-card ${level}`}>
+      <button className="status-main" onClick={onOpen}>
+        <span className="eyebrow"><i className="pulse" />{TODAY_LABEL()}</span>
+        {flock ? <span className="dayno">Day {flock.age_days}</span> : <span className="dayno">Today</span>}
+        <span className="headline">{today?.headline.text ?? 'Reading the coop.'}</span>
+        <span className="open">See the whole batch <b>→</b></span>
+      </button>
+      {flock && <Vitals f={flock} onOpen={onSheet} />}
+    </div>
   )
 }
 
@@ -130,7 +135,7 @@ function QuickRecord({ coopId, kind, onSaved }: { coopId: string; kind: string; 
   )
 }
 
-// ------------------------------------------------------------------ vitals and dock
+// ------------------------------------------------------------------ vitals and tabs
 
 export function Vitals({ f, onOpen }: { f: Flock; onOpen: (sheet: string) => void }) {
   const gap = Math.round((1 - f.growth.estimate_kg / f.growth.target_kg) * 100)
@@ -161,11 +166,11 @@ export const SHEETS: [string, string][] = [
   ['calls', 'Calls'], ['team', 'Team'], ['phone', 'Camera'],
 ]
 
-export function Dock({ onOpen, hide }: { onOpen: (k: string) => void; hide: string[] }) {
+export function Tabs({ onOpen, hide, open }: { onOpen: (k: string) => void; hide: string[]; open: string | null }) {
   return (
-    <nav className="dock">
+    <nav className="tabs">
       {SHEETS.filter(([k]) => !hide.includes(k)).map(([k, l]) => (
-        <button key={k} onClick={() => onOpen(k)}>{l}</button>
+        <button key={k} className={open === k ? 'on' : ''} onClick={() => onOpen(k)}>{l}</button>
       ))}
     </nav>
   )
@@ -397,12 +402,15 @@ const SOURCE_WORDS: Record<string, string> = {
   none: 'Nothing is connected. The coop cannot see.',
 }
 
+const RED_FLAG_WORDS = 'A test tape plays on a loop: a bird down among the flock, then the house clear. The coop calls when it sees the bird, and closes the alarm when the floor is clear again. One call every half hour.'
+
 export function SourcePanel({ coopId, source, canManage, onChange }: {
-  coopId: string; source?: { type: string; label?: string }; canManage: boolean; onChange: () => void
+  coopId: string; source?: { type: string; label?: string; feed?: string }; canManage: boolean; onChange: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const type = source?.type ?? 'none'
+  const feed = type === 'video' ? source?.feed ?? 'demo' : ''
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setErr('')
     try { await fn(); onChange() } catch (e: any) { setErr(e.message) } finally { setBusy(false) }
@@ -411,11 +419,12 @@ export function SourcePanel({ coopId, source, canManage, onChange }: {
     <div className={`source ${type}`}>
       <span className="eyebrow">Connected</span>
       <strong>{source?.label ?? (type === 'none' ? 'Nothing' : type)}</strong>
-      <span className="note">{SOURCE_WORDS[type] ?? ''}</span>
+      <span className="note">{type === 'video' && feed === 'red_flag' ? RED_FLAG_WORDS : SOURCE_WORDS[type] ?? ''}</span>
       {canManage && (
         <div className="row" style={{ marginTop: 10 }}>
           {type !== 'none' && <button className="btn" disabled={busy} onClick={() => run(() => del(`/api/coops/${coopId}/source`))}>Disconnect</button>}
-          {type !== 'video' && <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/coops/${coopId}/source/video`))}>Connect the video feed</button>}
+          {!(type === 'video' && feed === 'demo') && <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/coops/${coopId}/source/video`, { feed: 'demo' }))}>Connect the video feed</button>}
+          {!(type === 'video' && feed === 'red_flag') && <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/coops/${coopId}/source/video`, { feed: 'red_flag' }))}>Connect the red-flag tape</button>}
         </div>
       )}
       {err && <p className="error">{err}</p>}

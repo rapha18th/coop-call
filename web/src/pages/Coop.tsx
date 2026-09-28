@@ -8,7 +8,7 @@ import { letCoopCall, pushSupported } from '../lib/push'
 import { Calls, TeamPanel } from '../components/Panels'
 import { Growth, MoneyCard, Records, Routine, SellPlan, SetupFlock } from '../components/Flock'
 import { DeviceDetail, DevicePill } from '../components/Device'
-import { Actions, CalendarSheet, Dock, SHEETS, Sheet, SourcePanel, StatusCard, ThemeToggle, Vitals } from '../components/Today'
+import { Actions, CalendarSheet, SHEETS, Sheet, SourcePanel, StatusCard, Tabs, ThemeToggle } from '../components/Today'
 
 const STATUS_WORDS: Record<CallStatus, string> = {
   idle: '',
@@ -24,7 +24,7 @@ export default function CoopPage() {
   const params = useParams()
   const [search] = useSearchParams()
   const coopId = params.coopId ?? search.get('coop') ?? DEMO_COOP
-  const incomingAlarm = search.get('alarm')
+  const [incomingAlarm, setIncomingAlarm] = useState<string | null>(search.get('alarm'))
 
   const [user, setUser] = useState<User | null | undefined>(undefined)
   const [state, setState] = useState<State | null>(null)
@@ -39,11 +39,25 @@ export default function CoopPage() {
   const [sheet, setSheet] = useState<string | null>(null)
   const call = useRef<CoopCall | null>(null)
   const live = status === 'connecting' || status === 'listening' || status === 'thinking' || status === 'speaking'
+  const liveRef = useRef(false)
+  liveRef.current = live
 
   useEffect(() => watchUser(setUser), [])
 
+  // Alarms already open when the page loads show in the to-do list. A new one rings here too,
+  // so an open dashboard behaves like a phone.
+  const known = useRef<Set<string> | null>(null)
   const refresh = useCallback(() => {
-    api<State>(`/api/coops/${coopId}/state`).then((s) => { setState(s); setLoadError('') }).catch((e) => setLoadError(e.message))
+    api<State>(`/api/coops/${coopId}/state`).then((s) => {
+      setState(s)
+      setLoadError('')
+      const ids = s.alarms.map((a) => a.id)
+      if (known.current) {
+        const fresh = s.alarms.find((a) => a.status === 'ringing' && !known.current!.has(a.id))
+        if (fresh && !liveRef.current) { setIncomingAlarm(fresh.id); setRinging(true) }
+      }
+      known.current = new Set([...(known.current ?? []), ...ids])
+    }).catch((e) => setLoadError(e.message))
   }, [coopId])
 
   useEffect(() => {
@@ -104,6 +118,7 @@ export default function CoopPage() {
           {state?.coop.name ?? ''}
           {state?.now.note && <span className="badge">{state.now.note}</span>}
         </span>
+        <Tabs onOpen={setSheet} hide={hideSheets} open={sheet} />
         {state?.device && <DevicePill d={state.device} onOpen={() => setSheet('phone')} />}
         <ThemeToggle />
         {user && <Link to="/farm" className="quiet-link">Farm</Link>}
@@ -114,7 +129,7 @@ export default function CoopPage() {
 
       <main className="today">
         <section className="todaycol">
-          <StatusCard today={state?.today} flock={f} onOpen={() => setSheet('calendar')} />
+          <StatusCard today={state?.today} flock={f} onOpen={() => setSheet('calendar')} onSheet={setSheet} />
           {state && !f && manage && <SetupFlock coopId={coopId} onDone={refresh} />}
           {f?.inferred && <p className="inferred">Flock size and age estimated from the camera. <button className="quiet-link" onClick={() => setSheet('money')}>Correct them</button></p>}
           {state && (
@@ -150,8 +165,6 @@ export default function CoopPage() {
         </section>
       </main>
 
-      {f && <Vitals f={f} onOpen={setSheet} />}
-      <Dock onOpen={setSheet} hide={hideSheets} />
 
       {sheet === 'calendar' && <CalendarSheet coopId={coopId} onClose={() => setSheet(null)} />}
       {sheet && sheet !== 'calendar' && (

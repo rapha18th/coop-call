@@ -29,7 +29,7 @@ def reset(coop_id: str) -> None:
 
 
 def upload(folder: Path) -> None:
-    for clip in feed.DEMO_CLIPS:
+    for clip in feed.DEMO_CLIPS + feed.RED_FLAG_CLIPS:
         local = folder / Path(clip["path"]).name
         blob = store.bucket().blob(clip["path"], chunk_size=2 * 1024 * 1024)
         if blob.exists() and blob.size == local.stat().st_size:

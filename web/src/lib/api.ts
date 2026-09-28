@@ -79,7 +79,7 @@ export type Coop = { id: string; name: string; birds_expected?: number; owner_na
 export type State = {
   coop: Coop; role: string; now: Now; alarms: Alarm[]; strip: Hour[]; owner: boolean
   device: Device; flock: Flock | null; today?: TodayData
-  source?: { type: 'phone' | 'camera' | 'video' | 'pairing' | 'none'; label?: string }
+  source?: { type: 'phone' | 'camera' | 'video' | 'pairing' | 'none'; label?: string; feed?: string }
 }
 
 export type Device = {

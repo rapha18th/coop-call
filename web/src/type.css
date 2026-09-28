@@ -23,7 +23,7 @@ body { font-optical-sizing: auto; font-weight: 400; letter-spacing: 0; }
 
 /* text and small labels */
 .action .body strong { font-weight: 600; letter-spacing: -0.005em; }
-.btn, .dock button, .chip { font-weight: 500; }
+.btn, .tabs button, .chip { font-weight: 500; }
 .lamp { font-family: var(--mono); font-weight: 500; }
 .eyebrow, .label, .wd, .need .when, .pm { font-family: var(--mono); font-weight: 400; }
 .calcell .dnum { font-weight: 650; }

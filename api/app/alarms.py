@@ -68,10 +68,11 @@ def raise_alarm(coop_id: str, kind: str, detail: str = "", frame: str | None = N
     return alarm
 
 
-def resolve(coop_id: str, kind: str) -> None:
+def resolve(coop_id: str, kind: str, by: str | None = None) -> None:
     for a in open_alarms(coop_id):
         if a["kind"] == kind:
-            _alarms(coop_id).document(a["id"]).update({"status": "resolved", "resolved_at": store.now()})
+            _alarms(coop_id).document(a["id"]).update(
+                {"status": "resolved", "resolved_at": store.now(), "resolved_by": by or "auto"})
 
 
 def set_status(coop_id: str, alarm_id: str, status: str, by: str | None = None) -> None:
@@ -96,6 +97,9 @@ def evaluate(coop_id: str) -> None:
 
     if newest.get("unusual"):
         raise_alarm(coop_id, "unusual", newest["unusual"], newest.get("frame"))
+    elif len(two) == 2 and not any(o.get("unusual") for o in two):
+        # Two clear pictures in a row: whatever it was has gone.
+        resolve(coop_id, "unusual", by="camera")
 
     def both(pred) -> bool:
         return len(two) == 2 and all(pred(o) for o in two)

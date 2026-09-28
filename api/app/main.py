@@ -10,7 +10,7 @@ from collections import defaultdict, deque
 from datetime import timedelta
 from typing import Literal
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import firestore
 from pydantic import BaseModel, Field
@@ -451,10 +451,10 @@ def _disconnect(coop_id: str) -> None:
 
 
 @app.post("/api/coops/{coop_id}/source/video")
-def connect_video(coop_id: str, who: dict = Depends(signed_in)) -> dict:
+def connect_video(coop_id: str, body: dict | None = Body(default=None), who: dict = Depends(signed_in)) -> dict:
     access(coop_id, who, "owner")
     store.rotate_node_key(coop_id)
-    src = feed.connect(coop_id)
+    src = feed.connect(coop_id, (body or {}).get("feed", "demo"))
     return {"ok": True, "label": src["label"]}
 
 

@@ -12,7 +12,7 @@ Built for the AssemblyAI Voice Agent Hackathon, September 2026.
 2. **See.** Gemini reads each frame into a structured observation: bird count, how the flock is spread, activity, panting, feeder and drinker levels, and anything unusual.
 3. **Remember.** Observations land in Firestore and fold into hourly rollups. Each hour is compared with the same hour on earlier days.
 4. **Talk.** "Call the coop" opens a live voice session with AssemblyAI's Voice Agent API. The agent answers from the timeline through tools (`coop_now`, `coop_period`, `coop_vs_normal`, `show_picture`, `coop_alarms`, `resolve_alarm`), and every picture it cites appears on screen as evidence.
-5. **Push.** Two readings in a row of an empty drinker, a huddled flock, heat stress, or anything unusual raise an alarm. The coop rings the owner's phone with a Web Push notification styled as an incoming call. Answering opens the call with the alarm already loaded. It rings again every three minutes until someone answers.
+5. **Push.** Two readings in a row of an empty drinker, a huddled flock or heat stress raise an alarm. Anything unusual, such as a bird down, raises one at once, and two clear pictures in a row close it. The coop rings the owner's phone with a Web Push notification styled as an incoming call. Answering opens the call with the alarm already loaded. It rings again every three minutes until someone answers.
 
 ## A harness, not a wrapper
 
@@ -26,6 +26,12 @@ The voice on the call is backed by a working model of the broiler business.
 - **The phone.** Battery, charging, network, whether the view is clear or blocked, and whether pictures are being read.
 
 Every call starts with a briefing built from all of the above. Twelve tools let the agent look deeper while it talks.
+
+## Try it without a coop
+
+On any coop you own, open **Camera** and pick a feed. **Connect the video feed** plays broiler-house footage from Pexels. **Connect the red-flag tape** plays a loop in order, one picture a minute: a bird down among the flock for four pictures, then the house clear. The coop calls you when it sees the bird and closes the alarm when the floor is clear again. The loop runs 40 minutes and calls once each time round. Turn on **Let the coop call me** first, or keep the page open and it rings there.
+
+The tape's frames are from "Broilerihalli Isossakyrössä" by Oikeutta eläimille (Animal Rights Finland), CC BY 3.0, via Wikimedia Commons, resized and without sound.
 
 Growth and feed targets: Cobb500 Broiler Performance and Nutrition Supplement (2022). Default prices are Zimbabwe figures from September 2026 and are editable per flock.
 
