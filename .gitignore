@@ -47,3 +47,4 @@ ADRs.md
 .env.*
 !.env.example
 *.tsbuildinfo
+.firebase/
