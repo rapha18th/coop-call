@@ -34,6 +34,7 @@ Growth and feed targets: Cobb500 Broiler Performance and Nutrition Supplement (2
 ```
 api/       FastAPI on a Hugging Face Space: ingest, vision, timeline, tools, alarms, voice sessions
 web/       React on Cloud Run: landing, dashboard and call, the coop phone, the incoming call
+bridge/    any RTSP camera (Tapo, Imou, EZVIZ, Hikvision) as a coop camera, with optional sensors
 scripts/   deploy the API, generate push keys, create the demo coop
 ```
 
