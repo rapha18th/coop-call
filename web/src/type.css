@@ -1,0 +1,30 @@
+/* Savanna type: Bricolage Grotesque, sun-baked and wide like a painted store sign.
+   Optical sizing does the work: tight and heavy at display sizes, open at text sizes. */
+
+body { font-optical-sizing: auto; font-weight: 400; letter-spacing: 0; }
+
+/* display moments */
+.wordmark { font-weight: 800; font-stretch: 100%; letter-spacing: -0.035em; font-size: clamp(52px, 11vw, 96px); }
+.status-card .dayno { font-weight: 750; letter-spacing: -0.04em; font-size: clamp(60px, 8.4vw, 96px); line-height: 0.9; }
+.status-card .headline { font-weight: 450; letter-spacing: -0.01em; font-size: clamp(20px, 2.1vw, 25px); line-height: 1.28; }
+.spantitle { font-weight: 700; letter-spacing: -0.03em; font-size: clamp(30px, 4vw, 46px); }
+.story { font-weight: 450; letter-spacing: -0.01em; font-size: clamp(18px, 2vw, 23px); }
+.vital .v { font-weight: 700; letter-spacing: -0.03em; font-size: 34px; }
+.stile.hero .v, .tile.hero .big { font-weight: 750; letter-spacing: -0.04em; }
+.bigmoney, .bigday { font-weight: 750; letter-spacing: -0.035em; }
+.sheet h2, .section-head h2 { font-weight: 700; letter-spacing: -0.025em; font-size: 26px; }
+.incoming h1 { font-weight: 750; letter-spacing: -0.035em; }
+.allclear { font-weight: 500; font-size: 20px; }
+.said .coop { font-weight: 500; font-size: 20px; letter-spacing: -0.01em; }
+.callbody p.coop { font-weight: 500; font-size: 16px; }
+.coop .bar .mark, .top .mark { font-weight: 800; letter-spacing: -0.03em; font-size: 20px; }
+.morehead .t { font-weight: 700; letter-spacing: -0.02em; font-size: 22px; }
+.coopcard.add .plus { font-weight: 300; }
+
+/* text and small labels */
+.action .body strong { font-weight: 600; letter-spacing: -0.005em; }
+.btn, .dock button, .chip { font-weight: 500; }
+.lamp { font-family: var(--mono); font-weight: 500; }
+.eyebrow, .label, .wd, .need .when, .pm { font-family: var(--mono); font-weight: 400; }
+.calcell .dnum { font-weight: 650; }
+.stile .v, .tile .val, .stat .v { font-weight: 650; letter-spacing: -0.02em; }

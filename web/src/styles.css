@@ -12,9 +12,9 @@
   --lamp-soft: rgba(242, 169, 59, 0.16);
   --ember: #e0562b;
   --leaf: #8fb26b;
-  --display: 'Instrument Serif', Georgia, serif;
-  --ui: 'Inter', system-ui, -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --ui: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'DM Mono', ui-monospace, monospace;
   color-scheme: dark;
 }
 
