@@ -15,11 +15,17 @@ export default function Landing() {
     <main className="landing">
       <div style={{ position: 'fixed', top: 16, right: 16 }}><ThemeToggle /></div>
       <h1 className="wordmark">Coop Call</h1>
-      <p className="tagline">Call your coop. It tells you what happened, what is happening, and what to change.</p>
+      <p className="tagline">Your coop can talk now. Ask it anything. When something goes wrong, it calls you.</p>
 
-      <button className="lamp" onClick={() => nav(`/coop/${DEMO_COOP}`)}>
-        Call the coop
-      </button>
+      <div className="lampwrap">
+        <button className="lamp" onClick={() => nav(`/coop/${DEMO_COOP}`)}>
+          Call the coop
+        </button>
+        <Link to={`/coop/${DEMO_COOP}`} className="demo-note">
+          <span className="label">See the demo</span>
+          <span>A real broiler house, watched live</span>
+        </Link>
+      </div>
 
       {user === null && (
         <button className="quiet-link" onClick={() => signIn().then(() => nav('/farm')).catch((e) => setError(e.message))}>
