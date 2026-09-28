@@ -39,7 +39,7 @@ Growth and feed targets: Cobb500 Broiler Performance and Nutrition Supplement (2
 
 ```
 api/       FastAPI on a Hugging Face Space: ingest, vision, timeline, tools, alarms, voice sessions
-web/       React on Cloud Run: landing, dashboard and call, the coop phone, the incoming call
+web/       React on Firebase Hosting: landing, dashboard and call, the coop phone, the incoming call
 bridge/    any RTSP camera (Tapo, Imou, EZVIZ, Hikvision) as a coop camera, with optional sensors
 scripts/   deploy the API, generate push keys, create the demo coop
 ```
@@ -63,10 +63,10 @@ api/.venv/Scripts/python scripts/demo_coop.py --owner-uid <firebase uid> --simul
 ## Deploy
 
 ```bash
-api/.venv/Scripts/python scripts/deploy_api.py                                   # Hugging Face Space
-gcloud run deploy coop-call --source web --region africa-south1 --allow-unauthenticated   # web
+api/.venv/Scripts/python scripts/deploy_api.py                 # API on the Hugging Face Space
+npm --prefix web run build && firebase deploy --only hosting:coopcall   # web at https://coopcall.web.app
 ```
 
 ## Stack
 
-AssemblyAI Voice Agent API · Gemini 3.5 Flash-Lite · Firebase Auth, Firestore and Storage · FastAPI on Hugging Face Spaces · React on Cloud Run · Web Push
+AssemblyAI Voice Agent API · Gemini 3.5 Flash-Lite · Firebase Auth, Firestore and Storage · FastAPI on Hugging Face Spaces · React on Firebase Hosting · Web Push
