@@ -74,3 +74,7 @@ npm --prefix web run build && firebase deploy --only hosting:coopcall   # web at
 ## Stack
 
 AssemblyAI Voice Agent API · Gemini 3.5 Flash-Lite · Firebase Auth, Firestore and Storage · FastAPI on Hugging Face Spaces · React on Firebase Hosting · Web Push
+
+## Licence
+
+MIT. See [LICENSE](LICENSE). Footage credits: broiler-house clips from Pexels (Pexels licence); red-flag frames from "Broilerihalli Isossakyrössä" by Oikeutta eläimille, CC BY 3.0.
