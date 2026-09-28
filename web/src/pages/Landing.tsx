@@ -19,12 +19,9 @@ export default function Landing() {
 
       <div className="lampwrap">
         <button className="lamp" onClick={() => nav(`/coop/${DEMO_COOP}`)}>
-          Call the coop
+          See the demo
         </button>
-        <Link to={`/coop/${DEMO_COOP}`} className="demo-note">
-          <span className="label">See the demo</span>
-          <span>A real broiler house, watched live</span>
-        </Link>
+        <p className="demo-note">A real broiler house, watched live</p>
       </div>
 
       {user === null && (

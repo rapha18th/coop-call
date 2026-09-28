@@ -100,9 +100,7 @@ input { font: inherit; color: inherit; }
 }
 .tagline { color: var(--muted); font-size: 17px; max-width: 30ch; margin: 0 auto; }
 .lampwrap { display: flex; flex-direction: column; align-items: center; gap: 26px; }
-.demo-note { display: flex; flex-direction: column; align-items: center; gap: 5px; text-decoration: none; color: var(--muted); font-size: 13px; }
-.demo-note .label { color: var(--lamp); }
-.demo-note:hover span:last-child { color: var(--ink); }
+.demo-note { color: var(--muted); font-size: 13px; margin: 0; }
 .quiet-link { color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
 .quiet-link:hover { color: var(--ink); }
 .foot { position: fixed; bottom: 16px; left: 0; right: 0; text-align: center; }
