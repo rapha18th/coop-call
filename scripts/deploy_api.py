@@ -38,6 +38,7 @@ def main() -> None:
                              json.dumps(json.loads(Path(sa).read_text(encoding="utf-8"))))
     else:
         sys.exit(f"FIREBASE_SERVICE_ACCOUNT must point to a readable JSON key file (got {sa!r})")
+    api.add_space_variable(SPACE, "FEED_WORKER", "1")
     api.upload_folder(
         folder_path=str(ROOT / "api"), repo_id=SPACE, repo_type="space",
         ignore_patterns=[".venv/*", "**/__pycache__/*", "*.pyc"],

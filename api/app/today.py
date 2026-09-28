@@ -40,8 +40,10 @@ def actions(coop: dict, st: dict | None, dev: dict, open_alarms: list[dict]) -> 
         late = "overdue" in t["when"] or t["when"] == "now"
         if t["kind"] == "vaccine":
             name = t["text"].split(": ", 1)[1].split(" in the")[0]
-            out.append({"id": f"vax-{name}", "tone": "act" if late else "watch", "title": f"Give the {name[0].lower() + name[1:] if name.split()[0] in ('Day',) else name}",
-                        "detail": f"{t['when'].capitalize()} · in the drinking water. Check the product with your supplier.",
+            guess = st.get("inferred")
+            out.append({"id": f"vax-{name}", "tone": "act" if late and not guess else "watch", "title": f"Give the {name[0].lower() + name[1:] if name.split()[0] in ('Day',) else name}",
+                        "detail": (f"Due around now, if not given yet. The flock's age is estimated from the camera."
+                                   if guess else f"{t['when'].capitalize()} · in the drinking water. Check the product with your supplier."),
                         "buttons": [{"label": "Done", "do": "log", "kind": "vaccinated", "note": name}]})
         elif t["kind"] == "feed" and "lasts" in t["text"]:
             f = st["feed"]
@@ -57,13 +59,6 @@ def actions(coop: dict, st: dict | None, dev: dict, open_alarms: list[dict]) -> 
         elif t["kind"] == "weigh":
             out.append({"id": "weigh", "tone": "watch", "title": "Weigh ten birds",
                         "detail": "Every projection rests on it.",
-                        "buttons": [{"label": "Log a weight", "do": "form", "kind": "weighed"}]})
-    weighs = st["growth"]["weighs"]
-    if not weighs or st["age_days"] - weighs[-1]["day"] >= 8:
-        if not any(a["id"] == "weigh" for a in out) and st["age_days"] >= 7:
-            last = f"Last weigh-in on day {weighs[-1]['day']}." if weighs else "No weigh-in yet."
-            out.append({"id": "weigh", "tone": "watch", "title": "Weigh ten birds",
-                        "detail": f"{last} Projections assume {round(st['growth']['factor'] * 100)}% of the breed target.",
                         "buttons": [{"label": "Log a weight", "do": "form", "kind": "weighed"}]})
     best = st["money"]["best_day"]
     if best and 0 <= best - st["age_days"] <= 4:
@@ -94,9 +89,12 @@ def headline(coop: dict, st: dict | None, care: dict, dev: dict, acts: list[dict
         parts.append("The coop phone is not reporting, so today is unseen.")
         level = "watch"
     if st:
-        gap = 1 - st["growth"]["estimate_kg"] / st["growth"]["target_kg"]
-        if gap > 0.1:
-            parts.append(f"About {round(gap * 100)}% under the breed weight.")
+        if st["growth"]["measured"]:
+            gap = 1 - st["growth"]["estimate_kg"] / st["growth"]["target_kg"]
+            if gap > 0.1:
+                parts.append(f"About {round(gap * 100)}% under the breed weight.")
+        elif st.get("inferred"):
+            parts.append(f"About {st['birds']['placed']} birds around day {st['age_days']}, going by the camera.")
         f = st["feed"]
         if f["days_left"] is not None and f["days_left"] <= 5:
             parts.append(f"Feed runs out in {f['days_left']} days.")

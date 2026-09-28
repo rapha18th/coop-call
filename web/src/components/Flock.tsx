@@ -57,7 +57,7 @@ export function MoneyCard({ f }: { f: Flock }) {
         The last two weeks before selling eat <strong>{f.feed.last_two_weeks_share}%</strong> of the batch's feed.
         {f.feed.last_two_weeks_usd > 0 && <> Have about <strong>{usd(f.feed.last_two_weeks_usd)}</strong> ready for them.</>}
       </p>
-      <p className="note">Spent so far {usd(m.spent)} · {usd(m.cost_per_bird_so_far, 2)} a bird</p>
+      <p className="note">Cost so far about {usd(m.cost_so_far)} · {usd(m.cost_per_bird_so_far, 2)} a bird{m.estimated ? ', estimated from what the birds should have eaten' : ''}</p>
     </div>
   )
 }
@@ -275,7 +275,7 @@ export function Records({ coopId, canWrite, onChange }: { coopId: string; canWri
   }
   return (
     <div>
-      <p className="note" style={{ marginTop: 0 }}>Or just tell the coop on a call: "I bought ten bags of finisher for 300 dollars."</p>
+      <p className="note" style={{ marginTop: 0 }}>Optional. The coop estimates everything from what it sees; records only sharpen it.</p>
       {canWrite && (
         <form className="recordform" onSubmit={add}>
           <select value={kind} onChange={(e) => setKind(e.target.value)}>
@@ -380,7 +380,7 @@ export function SetupFlock({ coopId, onDone }: { coopId: string; onDone: () => v
   return (
     <form className="panel setup" onSubmit={save}>
       <span className="label">Set up this flock</span>
-      <p className="note">The coop tracks growth, feed and money from the day the chicks arrived.</p>
+      <p className="note">Optional. Leave it and the coop estimates the flock from the camera after a few pictures.</p>
       <FlockFields v={v} set={setV} />
       <button className="btn primary" style={{ marginTop: 12 }}>Start tracking</button>
       {err && <p className="error">{err}</p>}

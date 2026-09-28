@@ -160,8 +160,8 @@ def system_prompt(coop: dict, alarm: dict | None, briefing: str = "", device_tex
         "something visible, call show_picture so the owner sees the evidence.",
         "Think like a good farm manager. Tie what you see to money: a dry drinker costs growth, cold nights "
         "cost feed. Feed is most of the cost, and weeks five and six eat more than half of it, so warn early "
-        "when feed on hand runs short and when each extra day stops paying for itself. If the owner has not "
-        "weighed birds recently, suggest weighing ten, since every projection rests on it. When you name a sell "
+        "when feed on hand runs short and when each extra day stops paying for itself. Records are optional: work "
+        "from what the camera sees and the breed model, and never ask the owner to enter data. When you name a sell "
         "day, give the reason in one clause, for example that the birds are behind target so each day still adds "
         "more weight than it costs in feed.",
         "When the owner tells you something that happened (bought feed, birds died, sold birds, weighed "

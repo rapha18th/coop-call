@@ -27,7 +27,22 @@ export default function NodePage() {
   const [seen, setSeen] = useState<Seen | null>(null)
   const [stats, setStats] = useState({ frames: 0, beats: 0, motion: 0, sound: 0, light: 0 })
   const [error, setError] = useState('')
+  const [gone, setGone] = useState(false)
   const video = useRef<HTMLVideoElement>(null)
+  const stopRef = useRef(false)
+
+  async function disconnect() {
+    if (!confirm('Disconnect this phone from the coop? You will need a new code to connect again.')) return
+    stopRef.current = true
+    try {
+      await fetch(`${API}/api/node/${coopId}/disconnect`, { method: 'POST', headers: { 'X-Node-Key': key } })
+    } catch {}
+    try { localStorage.removeItem(`node:${coopId}`) } catch {}
+    const s = video.current?.srcObject as MediaStream | null
+    s?.getTracks().forEach((t) => t.stop())
+    setRunning(false)
+    setGone(true)
+  }
 
   async function start(file?: File) {
     setError('')
@@ -78,6 +93,7 @@ export default function NodePage() {
     const buf = new Float32Array(2048)
 
     const tick = async () => {
+      if (stopRef.current) return
       sctx.drawImage(v, 0, 0, 64, 48)
       const px = sctx.getImageData(0, 0, 64, 48).data
       let light = 0
@@ -181,8 +197,16 @@ export default function NodePage() {
             {stats.frames} frames · {stats.beats} heartbeats · light {stats.light} · sound {stats.sound} · motion {stats.motion}
           </p>
           {error && <p className="error">{error}</p>}
+          {running && <button className="quiet-link" style={{ marginTop: 10 }} onClick={disconnect}>Disconnect this phone</button>}
         </div>
       </div>
+      {gone && (
+        <div className="start">
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 16, textAlign: 'center' }}>
+            <p className="tagline">Disconnected. To connect again, scan a new pairing code from the coop's Camera sheet.</p>
+          </div>
+        </div>
+      )}
       {!running && (
         <div className="start">
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, padding: 16, textAlign: 'center' }}>

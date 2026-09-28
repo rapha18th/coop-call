@@ -156,3 +156,8 @@
 .calcell { aspect-ratio: auto; height: 66px; }
 .calcell .mon { font-family: var(--mono); font-size: 9px; color: var(--lamp); margin-left: 4px; text-transform: uppercase; }
 .sheet.wide .calgrid { max-width: 820px; margin: 0 auto; }
+
+.inferred { font-size: 12px; color: var(--muted); margin-top: -6px; }
+.source { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--night-2); margin-bottom: 14px; }
+.source strong { font-size: 18px; font-weight: 650; }
+.source.none strong { color: var(--ember); }

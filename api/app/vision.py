@@ -44,9 +44,12 @@ SCHEMA = {
             ),
         },
         "summary": {"type": "string", "description": "One plain sentence describing the scene."},
+        "age_days": {"type": "integer", "description": (
+            "Rough age of the broilers in days from their size and feathering: fluffy chicks 0 to 10, "
+            "feathering 11 to 21, fully feathered growers 22 to 35, heavy market birds 36 and up. 0 if unclear.")},
     },
     "required": ["birds", "spread", "activity", "panting", "feeder", "drinker", "lights",
-                 "unusual", "summary"],
+                 "unusual", "summary", "age_days"],
 }
 
 PROMPT = (

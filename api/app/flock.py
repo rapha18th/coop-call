@@ -159,9 +159,15 @@ def state(coop: dict) -> dict | None:
             left -= need
             days_left += 1
 
-    # Money so far.
+    # Money so far. Records sharpen it; without them the model estimates what the birds have eaten.
     spent = sum((r.get("amount_usd") or 0) for r in rows if r["kind"] in ("feed_bought", "expense"))
     income = sum((r.get("amount_usd") or 0) for r in rows if r["kind"] == "sold")
+    feed_logged = sum((r.get("amount_usd") or 0) for r in rows if r["kind"] == "feed_bought")
+    feed_est = eaten_kg * p["feed_per_kg"]
+    chicks = sum((r.get("amount_usd") or 0) for r in rows if r["kind"] == "expense" and r.get("note") == "Day-old chicks")
+    extras = sum((r.get("amount_usd") or 0) for r in rows if r["kind"] == "expense") - chicks
+    other_est = p["other_per_bird"] * placed * min(age, 40) / 40
+    cost_so_far = chicks + max(feed_logged, feed_est) + max(other_est, extras)
 
     plan = sell_plan(flock, alive, age, factor, spent, income, bought_kg, eaten_kg)
     best = max(plan, key=lambda r: r["margin"]) if plan else None
@@ -181,6 +187,7 @@ def state(coop: dict) -> dict | None:
     name, _, end = phase(age)
     return {
         "batch": flock["batch"], "placed": flock["placed"], "breed": flock.get("breed", "Cobb 500"),
+        "inferred": bool(flock.get("inferred")),
         "age_days": age, "week": age // 7 + 1, "phase": name,
         "phase_ends_in": end - age if end < 99 else None,
         "next_phase": phase(end + 1)[0] if end < 99 else None,
@@ -201,7 +208,8 @@ def state(coop: dict) -> dict | None:
                                              / 1000 * alive * p["feed_per_kg"]) if age < horizon else 0},
         "water_l_today": round(today_kg * 1.8, 1),
         "money": {"spent": round(spent, 2), "income": round(income, 2),
-                  "cost_per_bird_so_far": round(spent / placed, 2) if placed else None,
+                  "cost_so_far": round(cost_so_far), "estimated": not feed_logged,
+                  "cost_per_bird_so_far": round(cost_so_far / placed, 2) if placed else None,
                   "plan": plan, "best_day": best["day"] if best else None,
                   "chosen": chosen, "prices": p},
         "tasks": tasks(age, rows, days_left),
@@ -276,13 +284,18 @@ def briefing(s: dict | None) -> str:
     m, f, g, b = s["money"], s["feed"], s["growth"], s["birds"]
     ch = m.get("chosen") or {}
     due = " ".join(f"{t['text']} ({t['when']})." for t in s["tasks"] if t["when"] != "daily")
+    origin = ("The flock size and age were estimated from the camera, not entered by the owner. "
+              if s.get("inferred") else "")
+    on_hand = f"; feed on hand lasts about {f['days_left']} days" if f["days_left"] is not None else ""
+    cost_note = " (estimated from what the birds should have eaten)" if m["estimated"] else ""
     return (
-        f"Flock: day {s['age_days']} (week {s['week']}), {s['phase']} feed, {b['alive']} of {b['placed']} birds alive "
-        f"({b['mortality_pct']}% lost). Estimated weight {g['estimate_kg']} kg against a breed target of "
-        f"{g['target_kg']} kg, based on {g['factor_source']}. Feed today about {f['today_kg']} kg "
-        f"({f['today_bags']} bags); feed on hand lasts about {f['days_left']} days. Spent so far "
-        f"{money(m['spent'])}. If sold on day {ch.get('day')}, projected margin {money(ch.get('margin'))} "
-        f"({money(ch.get('margin_per_bird'), 2)} a bird); the model's best day is {m['best_day']}. The last two "
-        f"weeks before selling eat {f['last_two_weeks_share']}% of the batch's feed, about "
-        f"{money(f['last_two_weeks_usd'])} still to buy for them. Due: {due or 'nothing urgent.'}"
+        f"{origin}Flock: day {s['age_days']} (week {s['week']}), {s['phase']} feed, {b['alive']} of "
+        f"{b['placed']} birds ({b['mortality_pct']}% lost). Estimated weight {g['estimate_kg']} kg against a "
+        f"breed target of {g['target_kg']} kg, based on {g['factor_source']}. Feed today about "
+        f"{f['today_kg']} kg ({f['today_bags']} bags){on_hand}. Cost so far about "
+        f"{money(m['cost_so_far'])}{cost_note}. If sold on day {ch.get('day')}, projected margin "
+        f"{money(ch.get('margin'))} ({money(ch.get('margin_per_bird'), 2)} a bird); the model's best day is "
+        f"{m['best_day']}. The last two weeks before selling eat {f['last_two_weeks_share']}% of the batch's "
+        f"feed, about {money(f['last_two_weeks_usd'])} still to buy for them. Due: {due or 'nothing urgent.'} "
+        "Records are optional: never ask the owner to enter anything, work from what you see."
     )

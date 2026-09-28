@@ -8,7 +8,7 @@ import { letCoopCall, pushSupported } from '../lib/push'
 import { Calls, TeamPanel } from '../components/Panels'
 import { Growth, MoneyCard, Records, Routine, SellPlan, SetupFlock } from '../components/Flock'
 import { DeviceDetail, DevicePill } from '../components/Device'
-import { Actions, CalendarSheet, Dock, SHEETS, Sheet, StatusCard, ThemeToggle, Vitals } from '../components/Today'
+import { Actions, CalendarSheet, Dock, SHEETS, Sheet, SourcePanel, StatusCard, ThemeToggle, Vitals } from '../components/Today'
 
 const STATUS_WORDS: Record<CallStatus, string> = {
   idle: '',
@@ -116,6 +116,7 @@ export default function CoopPage() {
         <section className="todaycol">
           <StatusCard today={state?.today} flock={f} onOpen={() => setSheet('calendar')} />
           {state && !f && manage && <SetupFlock coopId={coopId} onDone={refresh} />}
+          {f?.inferred && <p className="inferred">Flock size and age estimated from the camera. <button className="quiet-link" onClick={() => setSheet('money')}>Correct them</button></p>}
           {state && (
             <Actions coopId={coopId} actions={state.today?.actions ?? []} onDo={onAction} onChange={refresh} />
           )}
@@ -144,9 +145,6 @@ export default function CoopPage() {
             <div className="said">
               {you && <span className="you">You: {you}</span>}
               {coopSaid && <span className="coop">{coopSaid}</span>}
-              {!you && !coopSaid && !live && (
-                <span className="note">Ask: How did they sleep? When should I sell? I bought ten bags of finisher.</span>
-              )}
             </div>
           </div>
         </section>
@@ -165,6 +163,7 @@ export default function CoopPage() {
           {sheet === 'team' && <TeamPanel coopId={coopId} />}
           {sheet === 'phone' && state && (
             <>
+              <SourcePanel coopId={coopId} source={state.source} canManage={manage} onChange={refresh} />
               <DeviceDetail d={state.device} />
               {state.now.sensors && <p className="note">{state.now.sensors}</p>}
               {['owner', 'keeper', 'admin'].includes(state.role) && (

@@ -1,7 +1,7 @@
 // Today, front and centre. Everything else one tap away.
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { api, post, usd, type Action, type ActionButton, type CalDay, type Flock, type Month, type Span, type TodayData } from '../lib/api'
+import { api, del, post, usd, type Action, type ActionButton, type CalDay, type Flock, type Month, type Span, type TodayData } from '../lib/api'
 import { currentTheme, setTheme, type Theme } from '../lib/theme'
 import { WeekGrid, pct } from './Charts'
 
@@ -158,7 +158,7 @@ function Vital({ label, v, sub, warn, onClick }: { label: string; v: string; sub
 
 export const SHEETS: [string, string][] = [
   ['calendar', 'Calendar'], ['growth', 'Growth'], ['money', 'Money'], ['records', 'Records'],
-  ['calls', 'Calls'], ['team', 'Team'], ['phone', 'Phone'],
+  ['calls', 'Calls'], ['team', 'Team'], ['phone', 'Camera'],
 ]
 
 export function Dock({ onOpen, hide }: { onOpen: (k: string) => void; hide: string[] }) {
@@ -385,4 +385,39 @@ function recWords(r: Span['records'][number]) {
   const m = r.amount_usd != null ? usd(r.amount_usd, 2) : ''
   const word: Record<string, string> = { feed_bought: 'Bought feed', deaths: 'Birds lost', sold: 'Sold', weighed: 'Weighed', expense: 'Spent', vaccinated: 'Vaccinated', note: 'Note' }
   return [word[r.kind] ?? r.kind, q, m, r.note].filter(Boolean).join(' · ')
+}
+
+// ------------------------------------------------------------------ camera source
+
+const SOURCE_WORDS: Record<string, string> = {
+  phone: 'A coop phone is connected.',
+  video: 'A video feed is connected. The coop reads it frame by frame, like a camera.',
+  pairing: 'Waiting for a phone to scan the pairing code.',
+  none: 'Nothing is connected. The coop cannot see.',
+}
+
+export function SourcePanel({ coopId, source, canManage, onChange }: {
+  coopId: string; source?: { type: string; label?: string }; canManage: boolean; onChange: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const type = source?.type ?? 'none'
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true); setErr('')
+    try { await fn(); onChange() } catch (e: any) { setErr(e.message) } finally { setBusy(false) }
+  }
+  return (
+    <div className={`source ${type}`}>
+      <span className="eyebrow">Connected</span>
+      <strong>{source?.label ?? (type === 'none' ? 'Nothing' : type)}</strong>
+      <span className="note">{SOURCE_WORDS[type] ?? ''}</span>
+      {canManage && (
+        <div className="row" style={{ marginTop: 10 }}>
+          {type !== 'none' && <button className="btn" disabled={busy} onClick={() => run(() => del(`/api/coops/${coopId}/source`))}>Disconnect</button>}
+          {type !== 'video' && <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/coops/${coopId}/source/video`))}>Connect the video feed</button>}
+        </div>
+      )}
+      {err && <p className="error">{err}</p>}
+    </div>
+  )
 }

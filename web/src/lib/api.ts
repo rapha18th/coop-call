@@ -79,6 +79,7 @@ export type Coop = { id: string; name: string; birds_expected?: number; owner_na
 export type State = {
   coop: Coop; role: string; now: Now; alarms: Alarm[]; strip: Hour[]; owner: boolean
   device: Device; flock: Flock | null; today?: TodayData
+  source?: { type: 'phone' | 'video' | 'pairing' | 'none'; label?: string }
 }
 
 export type Device = {
@@ -116,7 +117,7 @@ export type PlanRow = {
 }
 
 export type Flock = {
-  batch: string; placed: string; breed: string; age_days: number; week: number; phase: string
+  batch: string; placed: string; breed: string; inferred?: boolean; age_days: number; week: number; phase: string
   phase_ends_in: number | null; next_phase: string | null
   birds: { placed: number; alive: number; deaths: number; sold: number; mortality_pct: number }
   growth: {
@@ -132,7 +133,8 @@ export type Flock = {
   }
   water_l_today: number
   money: {
-    spent: number; income: number; cost_per_bird_so_far: number | null; plan: PlanRow[]
+    spent: number; income: number; cost_so_far: number; estimated: boolean
+    cost_per_bird_so_far: number | null; plan: PlanRow[]
     best_day: number | null; chosen: PlanRow | null
     prices: { chick: number; feed_per_kg: number; sell_per_kg: number; other_per_bird: number }
   }

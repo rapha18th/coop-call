@@ -15,7 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import firestore
 from pydantic import BaseModel, Field
 
-from . import alarms, batchcal, config, device, flock, metrics, store, timeline, today, vision, voice
+import os
+
+from . import alarms, batchcal, config, device, feed, flock, metrics, pipeline, store, timeline, today, vision, voice
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("coop")
@@ -23,7 +25,6 @@ log = logging.getLogger("coop")
 app = FastAPI(title="Ziso API", version="0.2.0")
 app.add_middleware(CORSMiddleware, allow_origins=config.WEB_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
-_last_vision: dict[str, float] = {}
 _demo_calls: dict[str, deque] = defaultdict(deque)
 _touched: dict[str, tuple[float, dict]] = {}
 
@@ -261,7 +262,10 @@ def edit_coop(coop_id: str, body: CoopEdit, who: dict = Depends(signed_in)) -> d
 @app.post("/api/coops/{coop_id}/node-key")
 def rotate_key(coop_id: str, who: dict = Depends(signed_in)) -> dict:
     access(coop_id, who, "owner")
-    return {"node_key": store.rotate_node_key(coop_id)}
+    key = store.rotate_node_key(coop_id)
+    store.coop_ref(coop_id).update({"source": {"type": "pairing", "label": "Waiting for a phone",
+                                               "connected_at": store.now()}, "device": {}})
+    return {"node_key": key}
 
 
 @app.get("/api/coops/{coop_id}/state")
@@ -285,6 +289,7 @@ def state(coop_id: str, who: dict | None = Depends(user)) -> dict:
         "coop": _public(coop),
         "role": role,
         "device": dev,
+        "source": {k: v for k, v in (coop.get("source") or {"type": "none"}).items() if k != "clips"},
         "flock": st,
         "today": {"headline": today.headline(coop, st, care, dev, acts), "actions": acts, "care": care},
         "now": timeline.answer_now(coop_id),
@@ -380,22 +385,6 @@ def cancel_invite(coop_id: str, email: str, who: dict = Depends(signed_in)) -> d
 # ------------------------------------------------------------------ the coop phone
 
 
-def _num(v) -> float | None:
-    try:
-        return None if v in (None, "") else float(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def _sensor_obs(sensors: dict, ts, simulated: bool = False) -> dict:
-    return {
-        "ts": ts, "source": "sensor", "simulated": simulated,
-        "brightness": _num(sensors.get("brightness")), "sound_db": _num(sensors.get("sound_db")),
-        "motion": _num(sensors.get("motion")), "battery": _num(sensors.get("battery")),
-        "charging": bool(sensors.get("charging")),
-    }
-
-
 def node_coop(coop_id: str, x_node_key: str | None) -> dict:
     coop = store.coop_for_node_key(coop_id, x_node_key or "")
     if not coop:
@@ -419,42 +408,55 @@ class Beat(BaseModel):
 
 @app.post("/api/node/{coop_id}/beat")
 def beat(coop_id: str, body: Beat, x_node_key: str | None = Header(default=None)) -> dict:
-    node_coop(coop_id, x_node_key)
-    data = body.model_dump()
-    timeline.record(coop_id, _sensor_obs(data, store.now()))
-    device.record_beat(coop_id, data)
+    coop = node_coop(coop_id, x_node_key)
+    _mark_phone(coop)
+    pipeline.ingest(coop_id, None, body.model_dump())
     return {"ok": True}
 
 
 @app.post("/api/node/{coop_id}/frame")
 def frame(coop_id: str, image: UploadFile = File(...), sensors: str = Form("{}"),
           x_node_key: str | None = Header(default=None)) -> dict:
-    node_coop(coop_id, x_node_key)
-    ts = store.now()
-    readings = json.loads(sensors or "{}")
-    timeline.record(coop_id, _sensor_obs(readings, ts))
-    device.record_beat(coop_id, readings)
-
-    since = time.time() - _last_vision.get(coop_id, 0)
-    if since < config.MIN_VISION_INTERVAL_S:
-        return {"analysed": False, "wait_s": round(config.MIN_VISION_INTERVAL_S - since)}
-    _last_vision[coop_id] = time.time()
-
+    coop = node_coop(coop_id, x_node_key)
+    _mark_phone(coop)
     jpeg = image.file.read()
     if len(jpeg) > 2_500_000:
         raise HTTPException(413, "frame too large")
-    path = store.save_frame(coop_id, ts, jpeg)
-    try:
-        seen = vision.read_frame(jpeg)
-    except Exception as exc:
-        log.exception("vision failed")
-        device.record_frame(coop_id, False, str(exc))
-        return {"analysed": False, "error": str(exc)[:200]}
-    device.record_frame(coop_id, True)
-    store.bump_usage(frames=1)
-    timeline.record(coop_id, {"ts": ts, "source": "vision", "simulated": False, "frame": path, **seen})
-    alarms.evaluate(coop_id)
-    return {"analysed": True, "seen": seen}
+    return pipeline.ingest(coop_id, jpeg, json.loads(sensors or "{}"))
+
+
+@app.post("/api/node/{coop_id}/disconnect")
+def node_disconnect(coop_id: str, x_node_key: str | None = Header(default=None)) -> dict:
+    """The coop phone lets go: its key stops working and the coop shows nothing connected."""
+    node_coop(coop_id, x_node_key)
+    _disconnect(coop_id)
+    return {"ok": True}
+
+
+def _mark_phone(coop: dict) -> None:
+    if (coop.get("source") or {}).get("type") != "phone":
+        store.coop_ref(coop["id"]).update({"source": {"type": "phone", "label": "Coop phone",
+                                                      "connected_at": store.now()}})
+
+
+def _disconnect(coop_id: str) -> None:
+    store.rotate_node_key(coop_id)
+    store.coop_ref(coop_id).update({"source": {"type": "none", "disconnected_at": store.now()}, "device": {}})
+
+
+@app.post("/api/coops/{coop_id}/source/video")
+def connect_video(coop_id: str, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "owner")
+    store.rotate_node_key(coop_id)
+    src = feed.connect(coop_id)
+    return {"ok": True, "label": src["label"]}
+
+
+@app.delete("/api/coops/{coop_id}/source")
+def disconnect(coop_id: str, who: dict = Depends(signed_in)) -> dict:
+    access(coop_id, who, "owner")
+    _disconnect(coop_id)
+    return {"ok": True}
 
 
 # ------------------------------------------------------------------ the call
@@ -676,6 +678,9 @@ def admin_block(uid: str, body: Block, who: dict = Depends(admin)) -> dict:
 # ------------------------------------------------------------------ the watch
 
 
+FEED_WORKER = os.environ.get("FEED_WORKER", "0") == "1"
+
+
 async def watch() -> None:
     """Every minute: is each coop phone still alive, and does any alarm need another ring."""
     while True:
@@ -683,11 +688,14 @@ async def watch() -> None:
             coops = await asyncio.to_thread(lambda: [
                 {"id": s.id, **s.to_dict()} for s in store.db().collection("coops").stream()])
             for coop in coops:
-                await asyncio.to_thread(alarms.check_heartbeat, coop)
+                if FEED_WORKER:
+                    await asyncio.to_thread(feed.tick, coop)
+                if (coop.get("source") or {}).get("type") in ("phone", "video"):
+                    await asyncio.to_thread(alarms.check_heartbeat, coop)
                 await asyncio.to_thread(alarms.re_ring, coop["id"])
         except Exception:
             log.exception("watch loop")
-        await asyncio.sleep(60)
+        await asyncio.sleep(30)
 
 
 @app.on_event("startup")
