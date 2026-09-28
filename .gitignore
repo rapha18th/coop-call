@@ -41,3 +41,7 @@ ADR.md
 
 # local tooling
 .claude/
+
+# per-environment config stays local
+.env.*
+!.env.example
