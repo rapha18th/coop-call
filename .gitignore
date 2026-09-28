@@ -29,6 +29,7 @@ Thumbs.db
 # local working notes, decision log, and anything about the competition
 # submission or strategy: the public repo is code and README only
 ADR.md
+ADRs.md
 .notes/
 .scratch/
 /strategy/

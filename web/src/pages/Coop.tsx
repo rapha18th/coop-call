@@ -233,13 +233,13 @@ function OwnerTools({ coopId, canPair, onChange }: { coopId: string; canPair: bo
   return (
     <div className="ownertools">
       <div className="row">
-        {canPair && <button className="btn" onClick={() => run(async () => showPair((await post(`/api/coops/${coopId}/node-key`)).node_key), '')}>Pair a coop phone</button>}
+        {canPair && <button className="btn" onClick={() => run(async () => showPair((await post(`/api/coops/${coopId}/node-key`)).node_key), '')}>Pair a phone or camera</button>}
         {pushSupported() && <button className="btn" onClick={() => run(() => letCoopCall(coopId), 'This phone will ring when the coop needs you.')}>Let the coop call me</button>}
         <button className="btn" onClick={() => run(async () => { await post(`/api/coops/${coopId}/alarms/test`, { kind: 'drinker_empty' }); onChange() }, 'Ringing your phone now.')}>Test a call from the coop</button>
       </div>
       {qr && (
         <>
-          <p className="note">Open this on the phone that will live in the coop. It becomes the coop's eyes and ears.</p>
+          <p className="note">Scan this with the phone that will live in the coop. For an IP camera, give this link to the Ziso bridge.</p>
           <img className="qr" src={qr} alt="Pairing code" />
           <p className="mono-break">{pairUrl}</p>
         </>

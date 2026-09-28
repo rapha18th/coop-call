@@ -391,8 +391,9 @@ function recWords(r: Span['records'][number]) {
 
 const SOURCE_WORDS: Record<string, string> = {
   phone: 'A coop phone is connected.',
+  camera: 'An IP camera is connected through the Ziso bridge.',
   video: 'A video feed is connected. The coop reads it frame by frame, like a camera.',
-  pairing: 'Waiting for a phone to scan the pairing code.',
+  pairing: 'Waiting for a phone to scan the code, or a bridge to use the link.',
   none: 'Nothing is connected. The coop cannot see.',
 }
 

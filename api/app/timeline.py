@@ -47,7 +47,7 @@ def fold(h: dict | None, obs: dict) -> dict:
     h.setdefault("first_ts", obs["ts"])
     if obs.get("simulated"):
         h["simulated"] = True
-    for key in ("brightness", "sound_db", "motion"):
+    for key in ("brightness", "sound_db", "motion", "temperature_c", "humidity_pct", "ammonia_ppm"):
         if obs.get(key) is not None:
             h[f"{key}_sum"] = h.get(f"{key}_sum", 0.0) + float(obs[key])
             h[f"{key}_n"] = h.get(f"{key}_n", 0) + 1
@@ -183,6 +183,15 @@ def describe_hour(h: dict) -> str:
     s = _mean(h, "sound_db")
     if s is not None:
         bits.append(f"sound level {s:.0f} of 100")
+    t = _mean(h, "temperature_c")
+    if t is not None:
+        bits.append(f"{t:.1f} °C")
+    rh = _mean(h, "humidity_pct")
+    if rh is not None:
+        bits.append(f"humidity {rh:.0f}%")
+    nh3 = _mean(h, "ammonia_ppm")
+    if nh3 is not None:
+        bits.append(f"ammonia {nh3:.0f} ppm")
     line = ", ".join(bits) + "."
     for n in h.get("notes", [])[-2:]:
         line += f" At {clock(n['ts'])}: {n['text']}"
@@ -210,6 +219,12 @@ def answer_now(coop_id: str) -> dict:
             sense.append(f"sound level {s['sound_db']:.0f} of 100")
         if s.get("brightness") is not None:
             sense.append(f"brightness {s['brightness']:.0f} of 255")
+        if s.get("temperature_c") is not None:
+            sense.append(f"{s['temperature_c']:.1f} °C")
+        if s.get("humidity_pct") is not None:
+            sense.append(f"humidity {s['humidity_pct']:.0f}%")
+        if s.get("ammonia_ppm") is not None:
+            sense.append(f"ammonia {s['ammonia_ppm']:.0f} ppm")
         if s.get("battery") is not None:
             sense.append(f"coop phone battery {round(s['battery'] * 100)}%"
                          + (" charging" if s.get("charging") else " not charging"))

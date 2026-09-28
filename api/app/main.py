@@ -404,13 +404,17 @@ class Beat(BaseModel):
     height: int | None = None
     version: str | None = None
     camera: str | None = None
+    temperature_c: float | None = None
+    humidity_pct: float | None = None
+    ammonia_ppm: float | None = None
 
 
 @app.post("/api/node/{coop_id}/beat")
 def beat(coop_id: str, body: Beat, x_node_key: str | None = Header(default=None)) -> dict:
     coop = node_coop(coop_id, x_node_key)
-    _mark_phone(coop)
-    pipeline.ingest(coop_id, None, body.model_dump())
+    data = body.model_dump()
+    _mark_source(coop, data.get("camera"))
+    pipeline.ingest(coop_id, None, data)
     return {"ok": True}
 
 
@@ -418,11 +422,12 @@ def beat(coop_id: str, body: Beat, x_node_key: str | None = Header(default=None)
 def frame(coop_id: str, image: UploadFile = File(...), sensors: str = Form("{}"),
           x_node_key: str | None = Header(default=None)) -> dict:
     coop = node_coop(coop_id, x_node_key)
-    _mark_phone(coop)
+    readings = json.loads(sensors or "{}")
+    _mark_source(coop, readings.get("camera"))
     jpeg = image.file.read()
     if len(jpeg) > 2_500_000:
         raise HTTPException(413, "frame too large")
-    return pipeline.ingest(coop_id, jpeg, json.loads(sensors or "{}"))
+    return pipeline.ingest(coop_id, jpeg, readings)
 
 
 @app.post("/api/node/{coop_id}/disconnect")
@@ -433,10 +438,11 @@ def node_disconnect(coop_id: str, x_node_key: str | None = Header(default=None))
     return {"ok": True}
 
 
-def _mark_phone(coop: dict) -> None:
-    if (coop.get("source") or {}).get("type") != "phone":
-        store.coop_ref(coop["id"]).update({"source": {"type": "phone", "label": "Coop phone",
-                                                      "connected_at": store.now()}})
+def _mark_source(coop: dict, camera: str | None) -> None:
+    """The first reading after pairing says what kind of eyes the coop has."""
+    kind, label = ("camera", "IP camera through the Ziso bridge") if camera == "rtsp" else ("phone", "Coop phone")
+    if (coop.get("source") or {}).get("type") != kind:
+        store.coop_ref(coop["id"]).update({"source": {"type": kind, "label": label, "connected_at": store.now()}})
 
 
 def _disconnect(coop_id: str) -> None:
@@ -690,7 +696,7 @@ async def watch() -> None:
             for coop in coops:
                 if FEED_WORKER:
                     await asyncio.to_thread(feed.tick, coop)
-                if (coop.get("source") or {}).get("type") in ("phone", "video"):
+                if (coop.get("source") or {}).get("type") in ("phone", "camera", "video"):
                     await asyncio.to_thread(alarms.check_heartbeat, coop)
                 await asyncio.to_thread(alarms.re_ring, coop["id"])
         except Exception:

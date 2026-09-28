@@ -24,6 +24,9 @@ def sensor_obs(sensors: dict, ts) -> dict:
         "brightness": _num(sensors.get("brightness")), "sound_db": _num(sensors.get("sound_db")),
         "motion": _num(sensors.get("motion")), "battery": _num(sensors.get("battery")),
         "charging": bool(sensors.get("charging")),
+        "temperature_c": _num(sensors.get("temperature_c")),
+        "humidity_pct": _num(sensors.get("humidity_pct")),
+        "ammonia_ppm": _num(sensors.get("ammonia_ppm")),
     }
 
 

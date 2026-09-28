@@ -15,7 +15,7 @@ def record_beat(coop_id: str, sensors: dict) -> None:
     now = store.now()
     update = {"device.last_beat": now}
     for key in ("battery", "charging", "network", "sharpness", "brightness", "width", "height",
-                "version", "camera", "mic"):
+                "version", "camera", "mic", "temperature_c", "humidity_pct", "ammonia_ppm"):
         if sensors.get(key) is not None:
             update[f"device.{key}"] = sensors[key]
     store.coop_ref(coop_id).update(update)
@@ -75,6 +75,13 @@ def health(coop: dict) -> dict:
         check("camera", "warn", f"No picture for {int(frame // 60)} minutes.")
     elif bright is not None:
         check("camera", "ok", "Clear view.")
+
+    t, rh, nh3 = d.get("temperature_c"), d.get("humidity_pct"), d.get("ammonia_ppm")
+    if t is not None or rh is not None or nh3 is not None:
+        parts = [f"{t:.1f} °C" if t is not None else None, f"{rh:.0f}% humidity" if rh is not None else None,
+                 f"{nh3:.0f} ppm ammonia" if nh3 is not None else None]
+        level = "warn" if (nh3 is not None and nh3 >= 25) else "ok"
+        check("air", level, ", ".join(p for p in parts if p) + (". Ammonia above 25 ppm; ventilate." if level == "warn" else "."))
 
     errs = d.get("vision_errors", 0)
     ok_at = _ago_s(d.get("last_vision_ok"))

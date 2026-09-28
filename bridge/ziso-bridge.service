@@ -1,0 +1,14 @@
+[Unit]
+Description=Ziso bridge: an IP camera as a coop camera
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/opt/ziso-bridge/ziso-bridge.env
+ExecStart=/opt/ziso-bridge/.venv/bin/python /opt/ziso-bridge/ziso_bridge.py
+Restart=always
+RestartSec=10
+User=pi
+
+[Install]
+WantedBy=multi-user.target
