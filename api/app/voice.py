@@ -174,8 +174,10 @@ def system_prompt(coop: dict, alarm: dict | None, briefing: str = "", device_tex
         "decision on them.",
     ]
     if alarm:
-        lines.append(f"You called the owner because of an alarm (id {alarm['id']}): {alarm['message']} "
-                     "Open with that, show the picture, say what it costs if left, then answer questions. "
+        seen = store.local(alarm["ts"]).strftime("%Y-%m-%dT%H:%M:%S")
+        lines.append(f"You called the owner because of an alarm (id {alarm['id']}) raised at {seen}: {alarm['message']} "
+                     f"Open with that, show the picture with show_picture at time {seen} (the moment it was seen, "
+                     "not now), say what it costs if left, then answer questions. "
                      "When the owner says it is handled, call resolve_alarm.")
     return "\n\n".join(l for l in lines if l)
 
