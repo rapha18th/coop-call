@@ -10,7 +10,10 @@ Built for the AssemblyAI Voice Agent Hackathon, September 2026.
 
 ## How it works
 
-![Coop Call architecture: every picture flows through one pipeline into Gemini, a Firestore timeline and a broiler flock model; you call the coop through the AssemblyAI Voice Agent API, and alarms call you through Web Push.](docs/architecture.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture.png">
+  <img alt="Coop Call architecture: every picture flows through one pipeline into Gemini, a Firestore timeline and a broiler flock model; you call the coop through the AssemblyAI Voice Agent API, and alarms call you through Web Push." src="docs/architecture-day.png">
+</picture>
 
 1. **Sense.** A phone in the coop opens `/node/<coop>` in Chrome. It watches and listens, and decides on the device what is worth sending: a frame when the scene changes or a minute passes, a heartbeat with light, sound and battery every 30 seconds.
 2. **See.** Gemini reads each frame into a structured observation: bird count, how the flock is spread, activity, panting, feeder and drinker levels, and anything unusual.
