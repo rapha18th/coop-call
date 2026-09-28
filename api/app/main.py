@@ -291,7 +291,7 @@ def state(coop_id: str, who: dict | None = Depends(user)) -> dict:
         "device": dev,
         "source": {k: v for k, v in (coop.get("source") or {"type": "none"}).items() if k != "clips"},
         "flock": st,
-        "today": {"headline": today.headline(coop, st, care, dev, acts), "actions": acts, "care": care},
+        "today": {"headline": today.headline(coop, st, care, dev, acts, open_alarms), "actions": acts, "care": care},
         "now": timeline.answer_now(coop_id),
         "alarms": [_alarm_view(a) for a in open_alarms],
         "strip": strip,

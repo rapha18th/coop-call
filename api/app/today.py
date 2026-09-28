@@ -69,7 +69,11 @@ def actions(coop: dict, st: dict | None, dev: dict, open_alarms: list[dict]) -> 
     return sorted(out, key=lambda a: order[a["tone"]])
 
 
-def headline(coop: dict, st: dict | None, care: dict, dev: dict, acts: list[dict]) -> dict:
+def headline(coop: dict, st: dict | None, care: dict, dev: dict, acts: list[dict],
+             open_alarms: list[dict] | None = None) -> dict:
+    # An open alarm is the only news that matters until someone deals with it.
+    if open_alarms:
+        return {"level": "act", "text": open_alarms[0]["message"]}
     parts: list[str] = []
     level = "good"
     if care.get("readings"):
@@ -109,4 +113,4 @@ def build(coop: dict) -> dict:
     raw_alarms = alarms.open_alarms(coop["id"])
     acts = actions(coop, st, dev, raw_alarms)
     care = _care_today(coop)
-    return {"headline": headline(coop, st, care, dev, acts), "actions": acts, "care": care}
+    return {"headline": headline(coop, st, care, dev, acts, raw_alarms), "actions": acts, "care": care}
