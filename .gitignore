@@ -45,3 +45,4 @@ ADR.md
 # per-environment config stays local
 .env.*
 !.env.example
+*.tsbuildinfo
