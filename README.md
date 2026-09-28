@@ -2,11 +2,15 @@
 
 Call your chicken coop. It tells you what happened, what is happening, and what to change. When something goes wrong, it calls you.
 
+**Live:** [coopcall.web.app](https://coopcall.web.app)
+
 Coop Call is the first place built on **Ziso** (Shona for *eye*). An old Android phone watches the coop. Gemini turns what it sees into a timeline. An AssemblyAI voice agent answers for the coop, in your browser.
 
 Built for the AssemblyAI Voice Agent Hackathon, September 2026.
 
 ## How it works
+
+![Coop Call architecture: every picture flows through one pipeline into Gemini, a Firestore timeline and a broiler flock model; you call the coop through the AssemblyAI Voice Agent API, and alarms call you through Web Push.](docs/architecture.png)
 
 1. **Sense.** A phone in the coop opens `/node/<coop>` in Chrome. It watches and listens, and decides on the device what is worth sending: a frame when the scene changes or a minute passes, a heartbeat with light, sound and battery every 30 seconds.
 2. **See.** Gemini reads each frame into a structured observation: bird count, how the flock is spread, activity, panting, feeder and drinker levels, and anything unusual.
