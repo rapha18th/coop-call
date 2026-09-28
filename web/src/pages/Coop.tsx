@@ -36,7 +36,7 @@ export default function CoopPage() {
   const [evidence, setEvidence] = useState<Evidence | null>(null)
   const [ringing, setRinging] = useState(Boolean(incomingAlarm))
   const [refreshKey, setRefreshKey] = useState(0)
-  const [sheet, setSheet] = useState<string | null>(null)
+  const [sheet, setSheet] = useState<string | null>(search.get('pair') ? 'phone' : null)
   const call = useRef<CoopCall | null>(null)
   const live = status === 'connecting' || status === 'listening' || status === 'thinking' || status === 'speaking'
   const liveRef = useRef(false)
