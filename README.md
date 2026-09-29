@@ -43,13 +43,13 @@ Every call starts with a briefing built from all of the above. Twelve tools let 
 5. Mount the phone where it sees the birds, the feeder and the drinker, and keep it on a charger.
 6. On your own phone, open the coop, then **Camera**, and press **Let the coop call me**, so alarms ring you like a call.
 
-Within a minute the dashboard shows the first picture and what Gemini read in it. With no records entered, the coop estimates the flock's size and age from the camera. To stop, press **Disconnect this phone** on the coop phone or **Disconnect** in the Camera sheet; either one retires the pairing link. For an IP camera, choose **An IP camera** instead: it gives the command for the [Ziso bridge](bridge/README.md) with the pairing link filled in. To remove a coop for good, the owner opens **Team** and presses **Delete this coop**.
+Within a minute the dashboard shows the first picture and what Gemini read in it. Left to itself, the coop estimates the flock's size and age from the camera. To stop, press **Disconnect this phone** on the coop phone or **Disconnect** in the Camera sheet; either one retires the pairing link. For an IP camera, choose **An IP camera** instead: it gives the command for the [Ziso bridge](bridge/README.md) with the pairing link filled in. To remove a coop for good, the owner opens **Team** and presses **Delete this coop**.
 
-## Try it without a coop
+## Try it with a video feed
 
 On any coop you own, open **Camera** and pick a feed. **Connect the video feed** plays broiler-house footage from Pexels. **Connect the red-flag tape** plays a loop in order, one picture a minute: a bird down among the flock for four pictures, then the house clear. The coop calls you when it sees the bird and closes the alarm when the floor is clear again. The loop runs 40 minutes and calls once each time round. Turn on **Let the coop call me** first, or keep the page open and it rings there.
 
-The tape's frames are from "Broilerihalli Isossakyrössä" by Oikeutta eläimille (Animal Rights Finland), CC BY 3.0, via Wikimedia Commons, resized and without sound.
+The tape's frames are from "Broilerihalli Isossakyrössä" by Oikeutta eläimille (Animal Rights Finland), CC BY 3.0, via Wikimedia Commons, resized and silent.
 
 Growth and feed targets: Cobb500 Broiler Performance and Nutrition Supplement (2022). Default prices are Zimbabwe figures from September 2026 and are editable per flock.
 
