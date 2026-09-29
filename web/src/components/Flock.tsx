@@ -336,7 +336,7 @@ export function FlockFields({ v, set }: { v: FlockForm; set: (v: FlockForm) => v
     <>
       <div className="row">
         <label className="field" style={{ flex: 1 }}><span className="note">Birds</span>
-          <input type="number" value={v.birds} onChange={(e) => set({ ...v, birds: Number(e.target.value) })} required min={1} /></label>
+          <input type="number" value={v.birds || ''} placeholder="e.g. 300" onChange={(e) => set({ ...v, birds: Number(e.target.value) })} required min={1} /></label>
         <label className="field" style={{ flex: 2 }}><span className="note">How old are they?</span>
           <select value={v.age} onChange={(e) => set({ ...v, age: e.target.value })} style={{ height: 40 }}>
             {AGES.map(([d, l]) => <option key={d} value={d}>{l}</option>)}
@@ -361,7 +361,7 @@ export function FlockFields({ v, set }: { v: FlockForm; set: (v: FlockForm) => v
 }
 
 export type FlockForm = { birds: number; age: string; ageDays: number; breed: string; chick: number; feedBag: number; sellKg: number; sellDay: number }
-export const FLOCK_DEFAULTS: FlockForm = { birds: 100, age: '0', ageDays: 0, breed: 'Cobb 500', chick: 0.9, feedBag: 31, sellKg: 2.1, sellDay: 35 }
+export const FLOCK_DEFAULTS: FlockForm = { birds: 0, age: '0', ageDays: 0, breed: 'Cobb 500', chick: 0.9, feedBag: 31, sellKg: 2.1, sellDay: 35 }
 export const flockBody = (v: FlockForm) => ({
   birds: v.birds, age_days: v.age === 'custom' ? v.ageDays : Number(v.age), breed: v.breed, sell_day: v.sellDay,
   prices: { chick: v.chick, feed_per_kg: v.feedBag / 50, sell_per_kg: v.sellKg },

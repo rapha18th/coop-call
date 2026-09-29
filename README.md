@@ -37,13 +37,13 @@ Every call starts with a briefing built from all of the above. Twelve tools let 
 ## Quick start: pair an Android phone
 
 1. Open [coopcall.web.app](https://coopcall.web.app) and press **Sign in to connect your own coop** (Google sign-in).
-2. On **Your farm**, name the coop and press **Create and pair a phone**. The coop opens with its **Camera** sheet showing a pairing code.
-3. On the phone that will live in the coop, scan the code with the camera app. The link opens in Chrome.
-4. Allow the camera and microphone, then press **Start watching**. The screen stays on while it watches.
+2. On **Your farm**, press **Add a coop** and name it. Leave **Let the camera estimate** chosen and the coop counts the birds and reads their age from its first pictures, or choose **I know my flock** to enter them.
+3. Press **Create and connect a camera**. The coop opens on its **Camera** sheet with three ways to connect: **A phone**, **An IP camera** (through the Ziso bridge) or **A video feed**. Choose **A phone**, then **Show the code**.
+4. On the phone that will live in the coop, scan the code with the camera app. The link opens in Chrome. Allow the camera and microphone, then press **Start watching**. The screen stays on while it watches.
 5. Mount the phone where it sees the birds, the feeder and the drinker, and keep it on a charger.
 6. On your own phone, open the coop, then **Camera**, and press **Let the coop call me**, so alarms ring you like a call.
 
-Within a minute the dashboard shows the first picture and what Gemini read in it. With no records entered, the coop estimates the flock's size and age from the camera. To stop, press **Disconnect this phone** on the coop phone or **Disconnect** in the Camera sheet; either one retires the pairing link. For an IP camera instead of a phone, give the same pairing link to the [Ziso bridge](bridge/README.md).
+Within a minute the dashboard shows the first picture and what Gemini read in it. With no records entered, the coop estimates the flock's size and age from the camera. To stop, press **Disconnect this phone** on the coop phone or **Disconnect** in the Camera sheet; either one retires the pairing link. For an IP camera, choose **An IP camera** instead: it gives the command for the [Ziso bridge](bridge/README.md) with the pairing link filled in. To remove a coop for good, the owner opens **Team** and presses **Delete this coop**.
 
 ## Try it without a coop
 

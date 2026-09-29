@@ -105,3 +105,6 @@ select { height: 32px; padding: 0 8px; border-radius: 8px; border: 1px solid var
 .spend { display: flex; align-items: flex-end; gap: 6px; height: 120px; margin-top: 12px; }
 .spendcol { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; font-family: var(--mono); font-size: 9px; color: var(--faint); }
 .spendbar { width: 60%; background: #c07e1c; border-radius: 4px 4px 0 0; min-height: 2px; }
+
+/* the new-coop form takes the whole row while it is open */
+.coopcard.form { grid-column: 1 / -1; max-width: 560px; }

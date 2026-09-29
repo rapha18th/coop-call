@@ -158,8 +158,9 @@ class FlockSetup(BaseModel):
 
 class NewCoop(BaseModel):
     name: str = Field(min_length=1, max_length=40)
-    birds: int = Field(ge=0, le=100000)
-    age_days: int = Field(default=0, ge=0, le=1000)
+    # Both optional: left out, the coop estimates the flock from the camera.
+    birds: int | None = Field(default=None, ge=0, le=100000)
+    age_days: int | None = Field(default=None, ge=0, le=1000)
     breed: str = "Cobb 500"
     prices: Prices = Prices()
     sell_day: int = Field(default=35, ge=28, le=56)
@@ -176,9 +177,18 @@ def new_coop(body: NewCoop, who: dict = Depends(signed_in)) -> dict:
     coop, key = store.create_coop(who["uid"], body.name, who.get("name", ""), body.birds, body.age_days,
                                   owner_email=(who.get("email") or "").lower())
     if body.birds:
-        flock.setup(coop["id"], body.birds, min(body.age_days, 70), body.breed,
+        flock.setup(coop["id"], body.birds, min(body.age_days or 0, 70), body.breed,
                     body.prices.model_dump(), body.sell_day)
     return {"coop": _public(coop), "node_key": key}
+
+
+@app.delete("/api/coops/{coop_id}")
+def delete_coop(coop_id: str, who: dict = Depends(signed_in)) -> dict:
+    """The owner removes the coop for everyone: its readings, pictures, records, calls and alarms."""
+    access(coop_id, who, "owner")
+    if coop_id == config.DEMO_COOP_ID:
+        raise HTTPException(400, "the demo coop stays")
+    return {"ok": True, **store.delete_coop(coop_id)}
 
 
 @app.put("/api/coops/{coop_id}/flock")

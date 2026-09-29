@@ -65,7 +65,7 @@ export default function Farm() {
                 <p className="note">
                   {c.latest.birds} birds {WORDS[c.latest.spread] ?? c.latest.spread} · drinker {c.latest.drinker.replace('_', ' ')} · {c.latest.ago}
                 </p>
-              ) : <p className="note">No readings yet. Pair a phone.</p>}
+              ) : <p className="note">No readings yet. Connect a camera.</p>}
               {!!c.open_alarms && <p className="alarmline">{c.open_alarms} alarm{c.open_alarms > 1 ? 's' : ''} open</p>}
             </div>
           </Link>
@@ -84,6 +84,7 @@ function NewCoop({ onMade }: { onMade: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [flock, setFlock] = useState<FlockForm>(FLOCK_DEFAULTS)
+  const [know, setKnow] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -91,7 +92,8 @@ function NewCoop({ onMade }: { onMade: (id: string) => void }) {
     e.preventDefault()
     setBusy(true)
     try {
-      const { coop, node_key } = await post('/api/coops', { name, ...flockBody(flock) })
+      // Left to the camera, the coop counts the birds and reads their age from the first pictures.
+      const { coop, node_key } = await post('/api/coops', know ? { name, ...flockBody(flock) } : { name })
       sessionStorage.setItem(`node-key:${coop.id}`, node_key)
       onMade(coop.id)
     } catch (err: any) {
@@ -114,8 +116,17 @@ function NewCoop({ onMade }: { onMade: (id: string) => void }) {
         <span className="note">Name</span>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="The hen house" required maxLength={40} autoFocus />
       </label>
-      <FlockFields v={flock} set={setFlock} />
-      <button className="btn primary" style={{ marginTop: 12 }} disabled={busy || !name}>Create and pair a phone</button>
+      <span className="note">The flock</span>
+      <div className="choice">
+        <button type="button" className={`opt ${know ? '' : 'on'}`} onClick={() => setKnow(false)}>
+          <b>Let the camera estimate</b><span>The coop counts the birds and reads their age from its first pictures.</span>
+        </button>
+        <button type="button" className={`opt ${know ? 'on' : ''}`} onClick={() => setKnow(true)}>
+          <b>I know my flock</b><span>Enter how many birds and how old they are.</span>
+        </button>
+      </div>
+      {know && <FlockFields v={flock} set={setFlock} />}
+      <button className="btn primary" style={{ marginTop: 12 }} disabled={busy || !name || (know && !flock.birds)}>Create and connect a camera</button>
       {error && <p className="error">{error}</p>}
     </form>
   )

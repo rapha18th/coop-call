@@ -152,7 +152,7 @@ def hash_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def create_coop(uid: str, name: str, owner_name: str, birds: int, age_days: int,
+def create_coop(uid: str, name: str, owner_name: str, birds: int | None, age_days: int | None,
                 coop_id: str | None = None, owner_email: str = "") -> tuple[dict, str]:
     node_key = secrets.token_urlsafe(24)
     ref = coop_ref(coop_id) if coop_id else db().collection("coops").document()
@@ -172,6 +172,16 @@ def create_coop(uid: str, name: str, owner_name: str, birds: int, age_days: int,
     }
     ref.set(data)
     return {"id": ref.id, **data}, node_key
+
+
+def delete_coop(coop_id: str) -> dict:
+    """Every document under the coop, then every picture it stored."""
+    frames = 0
+    for blob in bucket().list_blobs(prefix=f"coop-call/{coop_id}/"):
+        blob.delete()
+        frames += 1
+    db().recursive_delete(coop_ref(coop_id))
+    return {"frames": frames}
 
 
 def rotate_node_key(coop_id: str) -> str:

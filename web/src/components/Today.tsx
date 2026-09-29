@@ -402,7 +402,7 @@ const SOURCE_WORDS: Record<string, string> = {
   none: 'Nothing is connected. The coop cannot see.',
 }
 
-const RED_FLAG_WORDS = 'A test tape plays on a loop: a bird down among the flock, then the house clear. The coop calls when it sees the bird, and closes the alarm when the floor is clear again. One call every half hour.'
+const RED_FLAG_WORDS = 'A test tape plays on a loop: a bird down among the flock, then the house clear. The coop calls when it sees the bird, and closes the alarm when the floor is clear again. One call each 40-minute loop.'
 
 export function SourcePanel({ coopId, source, canManage, onChange }: {
   coopId: string; source?: { type: string; label?: string; feed?: string }; canManage: boolean; onChange: () => void
@@ -423,8 +423,6 @@ export function SourcePanel({ coopId, source, canManage, onChange }: {
       {canManage && (
         <div className="row" style={{ marginTop: 10 }}>
           {type !== 'none' && <button className="btn" disabled={busy} onClick={() => run(() => del(`/api/coops/${coopId}/source`))}>Disconnect</button>}
-          {!(type === 'video' && feed === 'demo') && <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/coops/${coopId}/source/video`, { feed: 'demo' }))}>Connect the video feed</button>}
-          {!(type === 'video' && feed === 'red_flag') && <button className="btn" disabled={busy} onClick={() => run(() => post(`/api/coops/${coopId}/source/video`, { feed: 'red_flag' }))}>Connect the red-flag tape</button>}
         </div>
       )}
       {err && <p className="error">{err}</p>}
